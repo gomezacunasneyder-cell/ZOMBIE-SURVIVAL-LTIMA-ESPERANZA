@@ -12,6 +12,8 @@ export interface InputFrame {
   reloadPressed: boolean;
   /** Ranura de arma elegida este fotograma (0–3), o `null`. */
   slotPressed: number | null;
+  /** Rueda del ratón: siguiente (1) o anterior (-1) arma. */
+  cycle: -1 | 0 | 1;
   /** Cualquier tecla de confirmación (para reintentar tras morir). */
   confirmPressed: boolean;
 }
@@ -31,6 +33,7 @@ export class PlayerInput {
   private readonly pressed = new Set<KeyName>();
   private fireQueued = false;
   private fireHeld = false;
+  private wheel: -1 | 0 | 1 = 0;
 
   constructor(private readonly scene: Phaser.Scene) {
     const keyboard = scene.input.keyboard;
@@ -47,10 +50,12 @@ export class PlayerInput {
     scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
     scene.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
     scene.input.on(Phaser.Input.Events.GAME_OUT, this.onPointerUp, this);
+    scene.input.on(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.input.off(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
       scene.input.off(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
       scene.input.off(Phaser.Input.Events.GAME_OUT, this.onPointerUp, this);
+      scene.input.off(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
     });
   }
 
@@ -64,11 +69,16 @@ export class PlayerInput {
     this.fireHeld = false;
   }
 
+  private onWheel(_pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number): void {
+    if (dy !== 0) this.wheel = dy > 0 ? 1 : -1;
+  }
+
   /** Olvida las pulsaciones pendientes (al volver de la pausa). */
   reset(): void {
     this.pressed.clear();
     this.fireQueued = false;
     this.fireHeld = false;
+    this.wheel = 0;
   }
 
   /** Lee y consume las acciones de este fotograma. */
@@ -89,7 +99,9 @@ export class PlayerInput {
     }
 
     const firePressed = this.fireQueued;
+    const cycle = this.wheel;
     this.fireQueued = false;
+    this.wheel = 0;
     this.pressed.clear();
 
     return {
@@ -101,6 +113,7 @@ export class PlayerInput {
       fireHeld: this.fireHeld,
       reloadPressed,
       slotPressed,
+      cycle,
       confirmPressed: enterPressed || reloadPressed || jumpPressed || firePressed,
     };
   }

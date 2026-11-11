@@ -5,6 +5,7 @@ export const SCENE = {
   hud: 'Hud',
   gallery: 'Gallery',
   compare: 'Compare',
+  arsenal: 'Arsenal',
   options: 'Options',
 } as const;
 

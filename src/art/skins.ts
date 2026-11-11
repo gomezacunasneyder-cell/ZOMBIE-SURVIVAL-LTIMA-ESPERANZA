@@ -53,14 +53,23 @@ export function skinAnimation(skin: PlayerSkin, name: BodyAnimation): string {
   return `${skin.prefix}/${name}`;
 }
 
-/** Fotograma del brazo que apunta en un ángulo dado. */
-export function skinArmFrame(skin: PlayerSkin, angle: number): string {
-  return `${skin.prefix}/arm/${angle}`;
+/** Pose del brazo: apuntando o con la corredera atrás (escopeta, tras disparar). */
+export type ArmPose = 'aim' | 'pump';
+
+/**
+ * Fotograma del brazo que apunta en un ángulo dado con un arma. La pistola
+ * conserva los nombres originales (`alex2/arm/0`) para que los paquetes de
+ * sprites exportados antes sigan valiendo; las demás armas añaden su nombre.
+ */
+export function skinArmFrame(skin: PlayerSkin, angle: number, weapon = 'pistol', pose: ArmPose = 'aim'): string {
+  if (weapon === 'pistol' && pose === 'aim') return `${skin.prefix}/arm/${angle}`;
+  return `${skin.prefix}/arm/${weapon}${pose === 'pump' ? '-pump' : ''}/${angle}`;
 }
 
-/** Fotograma del brazo durante la recarga. */
-export function skinReloadFrame(skin: PlayerSkin, index: number): string {
-  return `${skin.prefix}/reload/${index}`;
+/** Fotograma del brazo durante la recarga de un arma. */
+export function skinReloadFrame(skin: PlayerSkin, index: number, weapon = 'pistol'): string {
+  if (weapon === 'pistol') return `${skin.prefix}/reload/${index}`;
+  return `${skin.prefix}/reload/${weapon}/${index}`;
 }
 
 /** Fotograma de recarga que corresponde a un progreso 0–1. */

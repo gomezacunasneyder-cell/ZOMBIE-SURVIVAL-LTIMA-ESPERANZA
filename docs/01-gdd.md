@@ -57,14 +57,14 @@ Las teclas se definen en un mapa de acciones reasignable, no directamente en el 
 |---|---|---|---|---|
 | Cuchillo | Cuerpo a cuerpo, silencioso | — | Mínimo | Inicio |
 | Pistola | Fiable, munición común | 12 | Medio | Inicio |
-| Escopeta | Daño en abanico a corta distancia, empuja | 6 | Alto | Capítulo 2 |
-| Subfusil | Cadencia alta, poco daño por bala | 30 | Medio-alto | Capítulo 3 |
-| Fusil de asalto | Equilibrado, para hordas | 30 | Alto | Capítulo 4 |
+| Escopeta | Siete perdigones en abanico a corta distancia, empuja | 6 | Alto | Inicio |
+| Fusil de asalto | Automático, equilibrado y de largo alcance | 30 | Alto | Inicio |
+| Ametralladora | Automática, cadencia muy alta, recarga lenta | 60 | Muy alto | Inicio |
 | Granada / cóctel molotov | Área; el fuego ilumina y hace ruido | Consumible | Muy alto | Suministros |
 
-- La munición es por tipo (pistola, cartuchos, fusil) y se guarda en reserva.
+- La munición es propia de cada arma (9 mm, cartuchos, 5.56, cinta 7.62) y se guarda en reserva. Valores exactos en `src/content/weapons.ts`.
 - **Recarga manual** con duración por arma. Se interrumpe al cambiar de arma o al recibir un golpe fuerte. Recargar con balas en el cargador no las pierde.
-- Las armas de fuego usan impacto instantáneo con trazadora visual; granadas y proyectiles del jefe son objetos físicos.
+- Las armas de fuego disparan proyectiles rápidos con alcance y caída de daño por distancia; granadas y proyectiles del jefe son objetos físicos.
 - Cada arma está definida por datos (daño, cadencia, dispersión, retroceso, ruido, tiempo de recarga), no por código propio.
 
 ## 6. Inventario y objetos

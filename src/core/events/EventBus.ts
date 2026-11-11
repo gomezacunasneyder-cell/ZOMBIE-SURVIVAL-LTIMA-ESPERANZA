@@ -36,7 +36,9 @@ export interface GameEvents extends Record<string, unknown> {
   ammo: { magazine: number; magazineSize: number; reserve: number };
   /** Progreso de recarga 0–1, o `null` si no se está recargando. */
   reload: { progress: number | null };
-  weapon: { name: string; icon: string; slot: number };
+  weapon: { id: string; name: string; icon: string; slot: number };
+  /** Estado de todas las ranuras, para los indicadores 1–4 del HUD. */
+  arsenal: { active: number; slots: ({ name: string; magazine: number; reserve: number } | null)[] };
   kills: { total: number };
   /** Aviso breve en pantalla (cargador vacío, ranura vacía, munición recogida). */
   notice: { text: string };

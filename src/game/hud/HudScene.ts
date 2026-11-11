@@ -1,19 +1,19 @@
 import Phaser from 'phaser';
 import { colorNumber } from '../../art/palette';
-import { WEAPON_SLOTS } from '../../content/weapons';
 import type { EventBus, GameEvents } from '../../core/events/EventBus';
 import { ATLAS_KEY, FONT_KEY } from '../boot/registerArt';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { updateTestHook, type TextBounds } from '../debug/testHook';
 import { BUS_KEY, SCENE } from '../scenes/keys';
+import { PANEL, WeaponPanel } from './WeaponPanel';
 
 /** Margen mínimo entre cualquier elemento del HUD y el borde de la pantalla. */
 const MARGIN = 5;
 const BAR = { x: MARGIN + 14, y: MARGIN + 1, width: 72, height: 7 };
-const PANEL = { width: 112, height: 34 };
 const PANEL_X = GAME_WIDTH - MARGIN - PANEL.width;
 const PANEL_Y = GAME_HEIGHT - MARGIN - PANEL.height;
-const MAX_PIPS = 12;
+/** Barra de recarga bajo el punto de mira. */
+const CURSOR_BAR = { width: 13, dy: 8 };
 /** Alto de las franjas de la transición de zona. */
 const LETTERBOX = 11;
 
@@ -29,20 +29,17 @@ export class HudScene extends Phaser.Scene {
   private phaseText!: Phaser.GameObjects.BitmapText;
   private barTop!: Phaser.GameObjects.Rectangle;
   private barBottom!: Phaser.GameObjects.Rectangle;
-  private ammoText!: Phaser.GameObjects.BitmapText;
-  private weaponName!: Phaser.GameObjects.BitmapText;
-  private weaponIcon!: Phaser.GameObjects.Image;
-  private pips: Phaser.GameObjects.Image[] = [];
-  private slotTexts: Phaser.GameObjects.BitmapText[] = [];
-  private reloadBar!: Phaser.GameObjects.Graphics;
-  private reloadLabel!: Phaser.GameObjects.BitmapText;
+  private panel!: WeaponPanel;
+  private crosshair!: Phaser.GameObjects.Image;
+  private cursorBar!: Phaser.GameObjects.Graphics;
+  private reloadProgress: number | null = null;
   private killsText!: Phaser.GameObjects.BitmapText;
   private notice!: Phaser.GameObjects.BitmapText;
   private zoneTitle!: Phaser.GameObjects.BitmapText;
   private noticeUntil = 0;
   private zoneUntil = 0;
   private magazineEmpty = false;
-  private reloading = false;
+  private dead = false;
 
   constructor() {
     super(SCENE.hud);
@@ -50,25 +47,32 @@ export class HudScene extends Phaser.Scene {
 
   create(): void {
     this.texts = [];
-    this.pips = [];
-    this.slotTexts = [];
     this.noticeUntil = 0;
     this.zoneUntil = 0;
     this.magazineEmpty = false;
-    this.reloading = false;
+    this.reloadProgress = null;
+    this.dead = false;
 
     this.buildLetterbox();
     this.buildHealth();
     this.buildKills();
-    this.buildWeaponPanel();
+    this.panel = new WeaponPanel(this, PANEL_X, PANEL_Y, (x, y, content, scale) => this.text(x, y, content, scale));
     this.buildMessages();
+    this.buildCrosshair();
 
     const bus = this.registry.get(BUS_KEY) as EventBus<GameEvents>;
     const off = [
       bus.on('health', (e) => this.showHealth(e.current, e.max)),
-      bus.on('ammo', (e) => this.showAmmo(e.magazine, e.magazineSize, e.reserve)),
-      bus.on('reload', (e) => this.showReload(e.progress)),
-      bus.on('weapon', (e) => this.showWeapon(e.name, e.icon, e.slot)),
+      bus.on('ammo', (e) => {
+        this.magazineEmpty = e.magazine === 0;
+        this.panel.showAmmo(e.magazine, e.magazineSize, e.reserve);
+      }),
+      bus.on('reload', (e) => {
+        this.reloadProgress = e.progress;
+        this.panel.showReload(e.progress);
+      }),
+      bus.on('weapon', (e) => this.panel.showWeapon(e.icon, e.name)),
+      bus.on('arsenal', (e) => this.panel.showSlots(e)),
       bus.on('kills', (e) => this.killsText.setText(`x${e.total}`)),
       bus.on('notice', (e) => this.showNotice(e.text)),
       bus.on('zone', (e) => this.showZone(e.name)),
@@ -83,9 +87,8 @@ export class HudScene extends Phaser.Scene {
   override update(time: number): void {
     if (this.notice.visible && time >= this.noticeUntil) this.notice.setVisible(false);
     if (this.zoneTitle.visible && time >= this.zoneUntil) this.zoneTitle.setVisible(false);
-    // Aviso intermitente mientras el cargador esté vacío.
-    const prompt = this.magazineEmpty && !this.reloading;
-    this.reloadLabel.setVisible(this.reloading || (prompt && Math.floor(time / 350) % 2 === 0));
+    this.panel.update(time);
+    this.updateCrosshair();
   }
 
   // ───────────────────────── Construcción ─────────────────────────
@@ -119,24 +122,31 @@ export class HudScene extends Phaser.Scene {
     this.add.image(GAME_WIDTH - MARGIN - 40, MARGIN, ATLAS_KEY, 'ui/skull').setOrigin(0, 0);
   }
 
-  private buildWeaponPanel(): void {
-    const panel = this.add.graphics();
-    panel.fillStyle(colorNumber('outline'), 1).fillRect(PANEL_X, PANEL_Y, PANEL.width, PANEL.height);
-    panel.fillStyle(colorNumber('conc4'), 1).fillRect(PANEL_X + 1, PANEL_Y + 1, PANEL.width - 2, PANEL.height - 2);
-    panel.fillStyle(colorNumber('shadow'), 1).fillRect(PANEL_X + 2, PANEL_Y + 2, PANEL.width - 4, PANEL.height - 4);
+  /**
+   * Punto de mira que sigue al ratón (el cursor del sistema se oculta).
+   * Blanco normal, rojo con el cargador vacío y ámbar con una barra de
+   * progreso mientras se recarga.
+   */
+  private buildCrosshair(): void {
+    this.input.setDefaultCursor('none');
+    this.crosshair = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, ATLAS_KEY, 'ui/crosshair');
+    this.cursorBar = this.add.graphics();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.setDefaultCursor('default'));
+  }
 
-    this.weaponIcon = this.add.image(PANEL_X + 5, PANEL_Y + 5, ATLAS_KEY, 'ui/pistol').setOrigin(0, 0);
-    this.weaponName = this.text(PANEL_X + 30, PANEL_Y + 5, '');
-    this.ammoText = this.text(PANEL_X + PANEL.width - 5, PANEL_Y + 5, '', 1).setOrigin(1, 0);
-
-    for (let i = 0; i < MAX_PIPS; i++) {
-      this.pips.push(this.add.image(PANEL_X + 30 + i * 4, PANEL_Y + 13, ATLAS_KEY, 'ui/round').setOrigin(0, 0));
-    }
-    for (let i = 0; i < WEAPON_SLOTS; i++) {
-      this.slotTexts.push(this.text(PANEL_X + 6 + i * 6, PANEL_Y + 24, String(i + 1)));
-    }
-    this.reloadBar = this.add.graphics();
-    this.reloadLabel = this.text(PANEL_X + 30, PANEL_Y + 24, 'R: RECARGAR').setVisible(false);
+  private updateCrosshair(): void {
+    const pointer = this.input.activePointer;
+    const x = Math.round(pointer.x);
+    const y = Math.round(pointer.y);
+    this.crosshair.setPosition(x, y).setVisible(!this.dead);
+    const reloading = this.reloadProgress !== null;
+    this.crosshair.setTint(reloading ? colorNumber('light2') : this.magazineEmpty ? colorNumber('blood1') : 0xffffff);
+    const g = this.cursorBar.clear();
+    if (!reloading || this.dead) return;
+    const left = x - Math.floor(CURSOR_BAR.width / 2);
+    const top = y + CURSOR_BAR.dy;
+    g.fillStyle(colorNumber('outline'), 1).fillRect(left - 1, top - 1, CURSOR_BAR.width + 2, 4);
+    g.fillStyle(colorNumber('light2'), 1).fillRect(left, top, Math.round(CURSOR_BAR.width * (this.reloadProgress ?? 0)), 2);
   }
 
   private buildMessages(): void {
@@ -145,12 +155,12 @@ export class HudScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
       .setTint(colorNumber('light2'))
       .setVisible(false);
-    const hint = this.text(
-      MARGIN,
-      GAME_HEIGHT - MARGIN - 5,
-      'A/D MOVER  SHIFT CORRER  ESPACIO SALTAR  CLIC DISPARAR  R RECARGAR  ESC PAUSA',
-    );
-    this.time.delayedCall(14000, () => hint.setVisible(false));
+    // Dos líneas para no invadir el panel de armas.
+    const hints = [
+      this.text(MARGIN, GAME_HEIGHT - MARGIN - 12, 'A/D MOVER  SHIFT CORRER  ESPACIO SALTAR  ESC PAUSA'),
+      this.text(MARGIN, GAME_HEIGHT - MARGIN - 5, 'CLIC DISPARAR  R RECARGAR  1-4 O RUEDA: ARMA'),
+    ];
+    this.time.delayedCall(14000, () => hints.forEach((hint) => hint.setVisible(false)));
   }
 
   // ───────────────────────── Actualización ─────────────────────────
@@ -171,36 +181,6 @@ export class HudScene extends Phaser.Scene {
     this.healthText.setText(String(Math.ceil(current)));
   }
 
-  private showAmmo(magazine: number, magazineSize: number, reserve: number): void {
-    this.magazineEmpty = magazine === 0;
-    this.ammoText.setText(`${magazine}/${reserve}`);
-    this.ammoText.setTint(magazine === 0 ? colorNumber('blood1') : 0xffffff);
-    this.pips.forEach((pip, i) => {
-      pip.setVisible(i < Math.min(magazineSize, MAX_PIPS));
-      pip.setFrame(i < magazine ? 'ui/round' : 'ui/round-empty');
-    });
-  }
-
-  private showReload(progress: number | null): void {
-    this.reloading = progress !== null;
-    this.reloadLabel.setText(this.reloading ? 'RECARGANDO' : 'R: RECARGAR');
-    this.reloadLabel.setTint(this.reloading ? colorNumber('light2') : colorNumber('blood1'));
-    const g = this.reloadBar.clear();
-    if (progress === null) return;
-    const x = PANEL_X + 76;
-    const y = PANEL_Y + 25;
-    const width = 30;
-    g.fillStyle(colorNumber('outline'), 1).fillRect(x - 1, y - 1, width + 2, 5);
-    g.fillStyle(colorNumber('asph4'), 1).fillRect(x, y, width, 3);
-    g.fillStyle(colorNumber('light2'), 1).fillRect(x, y, Math.round(width * progress), 3);
-  }
-
-  private showWeapon(name: string, icon: string, slot: number): void {
-    this.weaponName.setText(name);
-    this.weaponIcon.setFrame(icon);
-    this.slotTexts.forEach((text, i) => text.setTint(i === slot ? colorNumber('light2') : colorNumber('grey3')));
-  }
-
   private showNotice(content: string): void {
     this.notice.setText(content).setVisible(true);
     this.noticeUntil = this.time.now + 1500;
@@ -219,6 +199,8 @@ export class HudScene extends Phaser.Scene {
   }
 
   private showGameOver(kills: number): void {
+    this.dead = true;
+    this.input.setDefaultCursor('default');
     const veil = this.add.graphics();
     veil.fillStyle(colorNumber('outline'), 0.7).fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     const centre = GAME_WIDTH / 2;

@@ -14,6 +14,8 @@ export interface SimHook {
   setNight(night: number | null): void;
   /** Hace estallar el bidón más cercano a `x`. */
   detonate(x: number): boolean;
+  /** Fija cargador y reserva de una ranura (para probar casos límite sin gastar cientos de balas). */
+  setAmmo(slot: number, magazine: number, reserve: number): void;
 }
 
 export interface TextBounds {
@@ -51,7 +53,7 @@ declare global {
 
 /** Opciones de arranque leídas de la URL (`?scene=gallery&freeze=1&test=1`). */
 export interface LaunchOptions {
-  scene: 'game' | 'gallery' | 'compare';
+  scene: 'game' | 'gallery' | 'compare' | 'arsenal';
   /** Detiene las animaciones de la galería para capturas reproducibles. */
   freeze: boolean;
   /** Arranca el nivel sin enemigos, para pruebas deterministas. */
@@ -75,7 +77,7 @@ export function readLaunchOptions(search: string): LaunchOptions {
   const params = new URLSearchParams(search);
   const scene = params.get('scene');
   return {
-    scene: scene === 'gallery' || scene === 'compare' ? scene : 'game',
+    scene: scene === 'gallery' || scene === 'compare' || scene === 'arsenal' ? scene : 'game',
     freeze: params.get('freeze') === '1',
     test: params.get('test') === '1',
     skin: parseSkinId(params.get('skin')),

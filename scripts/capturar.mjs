@@ -103,6 +103,47 @@ await page.evaluate(() => window.__ZS__.sim.spawnZombie(700));
 await page.waitForTimeout(700);
 await crop('alex-en-juego', 150, 150, 220, 90);
 
+// 8. Arsenal: las cuatro armas en los 7 ángulos y en combate.
+await page.goto(`${BASE}/?scene=arsenal&freeze=1`);
+await ready('Arsenal');
+await page.waitForTimeout(300);
+await shot('fase3-arsenal');
+
+const equip = async (key, id) => {
+  await page.keyboard.press(key);
+  await page.waitForFunction((want) => {
+    const w = window.__ZS__.sim.state().weapon;
+    return w.id === want && w.ready;
+  }, id);
+};
+for (const [key, id, name] of [['1', 'pistol', 'pistola'], ['2', 'shotgun', 'escopeta'], ['3', 'rifle', 'fusil'], ['4', 'mg', 'ametralladora']]) {
+  await openAt('noche', 1560);
+  await page.evaluate(() => {
+    const sim = window.__ZS__.sim;
+    sim.spawnZombie(1625);
+    sim.spawnZombie(1680);
+  });
+  await page.waitForTimeout(500);
+  await equip(key, id);
+  await page.mouse.down();
+  await page.waitForTimeout(id === 'shotgun' || id === 'pistol' ? 30 : 260);
+  await shot(`fase3-disparo-${name}`);
+  await page.mouse.up();
+}
+
+// 9. HUD: recargando el fusil y ametralladora sin munición.
+await openAt('atardecer', 600);
+await equip('3', 'rifle');
+await page.evaluate(() => window.__ZS__.sim.setAmmo(2, 4, 60));
+await page.keyboard.press('r');
+await page.waitForFunction(() => window.__ZS__.sim.state().weapon.reloading);
+await page.waitForTimeout(700);
+await crop('fase3-hud-recarga', 240, 200, 240, 70);
+await equip('4', 'mg');
+await page.evaluate(() => window.__ZS__.sim.setAmmo(3, 0, 0));
+await page.waitForTimeout(300);
+await crop('fase3-hud-sin-municion', 240, 200, 240, 70);
+
 await browser.close();
 if (errors.length > 0) {
   console.error('ERRORES EN CONSOLA:\n' + errors.join('\n'));

@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
-import { synthGunshot, type SynthSound } from '../../audio/synth/gunshot';
+import { GUN_VOICES, synthGunshot, type SynthSound } from '../../audio/synth/gunshot';
+import { WEAPONS } from '../../content/weapons';
 import { synthDeathCry, synthExplosion, synthFootstep, synthSnarl, synthZap } from '../../audio/synth/impacts';
 import {
   synthAlarmLoop,
@@ -11,12 +12,16 @@ import {
 } from '../../audio/synth/loops';
 import {
   synthDryFire,
+  synthEquip,
   synthFleshHit,
   synthGroan,
   synthHurt,
   synthPickup,
+  synthPump,
   synthReload,
   synthRicochet,
+  synthRifleReload,
+  synthShellInsert,
 } from '../../audio/synth/sfx';
 import { positional } from '../../core/settings/audioSettings';
 import { audioState } from '../audio/audioState';
@@ -24,7 +29,6 @@ import { GAME_WIDTH } from '../config';
 
 /** Efectos puntuales. */
 export const SFX = {
-  gunshot: 'sfx/gunshot',
   dryFire: 'sfx/dry-fire',
   reload: 'sfx/reload',
   fleshHit: 'sfx/flesh-hit',
@@ -38,7 +42,18 @@ export const SFX = {
   deathCry: 'sfx/death-cry',
   explosion: 'sfx/explosion',
   zap: 'sfx/zap',
+  pump: 'sfx/pump',
+  equip: 'sfx/equip',
+  rifleReload: 'sfx/rifle-reload',
+  shellInsert: 'sfx/shell-insert',
 } as const;
+
+/** Disparo propio de cada arma: `sfx/shot/<id>`. */
+export type ShotKey = `sfx/shot/${string}`;
+
+export function shotSfx(weaponId: string): ShotKey {
+  return `sfx/shot/${weaponId}`;
+}
 
 /** Sonidos en bucle: ambiente y música. */
 export const LOOP = {
@@ -50,11 +65,18 @@ export const LOOP = {
   combat: 'loop/combat',
 } as const;
 
-export type SfxKey = (typeof SFX)[keyof typeof SFX];
+export type SfxKey = (typeof SFX)[keyof typeof SFX] | ShotKey;
 export type LoopKey = (typeof LOOP)[keyof typeof LOOP];
 
-const RECIPES: Record<SfxKey | LoopKey, (sampleRate: number) => SynthSound> = {
-  [SFX.gunshot]: synthGunshot,
+type Recipe = (sampleRate: number) => SynthSound;
+
+/** Una voz por arma; un arma sin voz propia suena como la pistola. */
+const SHOT_RECIPES: Record<ShotKey, Recipe> = Object.fromEntries(
+  WEAPONS.map((weapon, i) => [shotSfx(weapon.id), (rate: number) => synthGunshot(rate, i + 1, GUN_VOICES[weapon.id])]),
+);
+
+const RECIPES: Record<SfxKey | LoopKey, Recipe> = {
+  ...SHOT_RECIPES,
   [SFX.dryFire]: synthDryFire,
   [SFX.reload]: synthReload,
   [SFX.fleshHit]: synthFleshHit,
@@ -68,6 +90,10 @@ const RECIPES: Record<SfxKey | LoopKey, (sampleRate: number) => SynthSound> = {
   [SFX.deathCry]: synthDeathCry,
   [SFX.explosion]: synthExplosion,
   [SFX.zap]: synthZap,
+  [SFX.pump]: synthPump,
+  [SFX.equip]: synthEquip,
+  [SFX.rifleReload]: synthRifleReload,
+  [SFX.shellInsert]: synthShellInsert,
   [LOOP.wind]: synthWindLoop,
   [LOOP.helicopter]: synthHelicopterLoop,
   [LOOP.alarm]: synthAlarmLoop,
@@ -86,8 +112,8 @@ export function registerAudio(scene: Phaser.Scene): boolean {
   const context = manager.context;
   if (!context) return false;
 
-  for (const key of Object.keys(RECIPES) as (SfxKey | LoopKey)[]) {
-    const sound = RECIPES[key](context.sampleRate);
+  for (const [key, recipe] of Object.entries(RECIPES)) {
+    const sound = recipe(context.sampleRate);
     const buffer = context.createBuffer(1, sound.samples.length, sound.sampleRate);
     buffer.getChannelData(0).set(sound.samples);
     scene.cache.audio.add(key, buffer);

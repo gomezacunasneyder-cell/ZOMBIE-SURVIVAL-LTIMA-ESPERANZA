@@ -19,6 +19,7 @@ export class WeaponState<Def extends WeaponRules = WeaponRules> {
   private reserveRounds: number;
   private nextShotAt = -Infinity;
   private reloadStartedAt: number | null = null;
+  private firedRounds = 0;
 
   constructor(readonly def: Def) {
     this.magazineRounds = def.magazineSize;
@@ -33,6 +34,11 @@ export class WeaponState<Def extends WeaponRules = WeaponRules> {
     return this.reserveRounds;
   }
 
+  /** Balas disparadas desde que existe el arma (para comprobar que no se crean ni se pierden). */
+  get fired(): number {
+    return this.firedRounds;
+  }
+
   get reloading(): boolean {
     return this.reloadStartedAt !== null;
   }
@@ -43,6 +49,7 @@ export class WeaponState<Def extends WeaponRules = WeaponRules> {
     if (now < this.nextShotAt) return 'cooldown';
     if (this.magazineRounds <= 0) return 'empty';
     this.magazineRounds -= 1;
+    this.firedRounds += 1;
     this.nextShotAt = now + this.def.fireIntervalMs;
     return 'fired';
   }
@@ -74,6 +81,13 @@ export class WeaponState<Def extends WeaponRules = WeaponRules> {
     this.reserveRounds -= moved;
     this.reloadStartedAt = null;
     return true;
+  }
+
+  /** Fija cargador y reserva dentro de sus límites (solo pruebas). */
+  debugSetAmmo(magazine: number, reserve: number): void {
+    this.cancelReload();
+    this.magazineRounds = Math.max(0, Math.min(this.def.magazineSize, Math.floor(magazine)));
+    this.reserveRounds = Math.max(0, Math.min(this.def.reserveMax, Math.floor(reserve)));
   }
 
   /** Añade munición a la reserva. Devuelve cuánta cupo. */

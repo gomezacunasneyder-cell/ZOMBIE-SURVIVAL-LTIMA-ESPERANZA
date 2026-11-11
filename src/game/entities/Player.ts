@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import { skinAnimation, type BodyAnimation, type PlayerSkin } from '../../art/skins';
 import type { PlayerTuning } from '../../content/player';
-import { STARTING_LOADOUT, type WeaponDef } from '../../content/weapons';
-import { aimAngleTowards, type AimAngle } from '../../core/combat/aim';
-import { shotDirection, spreadFrom } from '../../core/combat/ballistics';
+import type { WeaponDef } from '../../content/weapons';
+import { aimDegreesTowards, snapAimAngle, type AimAngle } from '../../core/combat/aim';
+import type { Resupply } from '../../core/combat/Arsenal';
 import { Health } from '../../core/combat/Health';
-import { WeaponState } from '../../core/combat/WeaponState';
+import type { WeaponState } from '../../core/combat/WeaponState';
 import type { EventBus, GameEvents } from '../../core/events/EventBus';
 import { JumpController, stepHorizontalVelocity } from '../../core/player/motion';
 import { ATLAS_KEY } from '../boot/registerArt';
@@ -13,17 +13,9 @@ import { SFX, playSfx } from '../boot/registerAudio';
 import type { InputFrame } from '../input/PlayerInput';
 import { DEPTH } from '../world/depths';
 import { AimRig, type Point } from './AimRig';
+import { WeaponHandler, type ShotRequest } from './WeaponHandler';
 
-/** Datos de un disparo que la escena convierte en bala, sonido y efectos. */
-export interface ShotRequest {
-  x: number;
-  y: number;
-  dirX: number;
-  dirY: number;
-  aim: AimAngle;
-  facing: 1 | -1;
-  weapon: WeaponDef;
-}
+export type { ShotRequest };
 
 /**
  * Caja de colisión, siempre la misma sea cual sea el aspecto: 10×24 px,
@@ -50,12 +42,10 @@ export class Player {
   private readonly rig: AimRig;
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly jump: JumpController;
-  private readonly weapons: (WeaponState<WeaponDef> | null)[];
-  private slot = 0;
+  private readonly arms: WeaponHandler;
   private aim: AimAngle = 0;
+  private aimFree = 0;
   private hurtUntil = 0;
-  private lastAmmoKey = '';
-  private lastReload: number | null = null;
   // Falso al aparecer: el asentamiento inicial no cuenta como aterrizaje.
   private wasOnGround = false;
   private landUntil = 0;
@@ -76,7 +66,7 @@ export class Player {
   ) {
     this.health = new Health(tuning.maxHealth, tuning.invulnerableMs);
     this.jump = new JumpController(tuning);
-    this.weapons = STARTING_LOADOUT.map((def) => (def ? new WeaponState(def) : null));
+    this.arms = new WeaponHandler(scene, bus);
 
     this.shadow = scene.add.image(x, groundY + 1, ATLAS_KEY, 'fx/shadow').setAlpha(0.4).setDepth(DEPTH.player - 0.2);
     this.sprite = scene.physics.add
@@ -134,11 +124,25 @@ export class Player {
   }
 
   get weapon(): WeaponState<WeaponDef> {
-    return this.weapons[this.slot] as WeaponState<WeaponDef>;
+    return this.arms.weapon;
+  }
+
+  get weapons(): WeaponHandler {
+    return this.arms;
   }
 
   get aimAngle(): AimAngle {
     return this.aim;
+  }
+
+  /** Ángulo libre hacia el cursor, por el que salen las balas. */
+  get aimDegrees(): number {
+    return this.aimFree;
+  }
+
+  /** Fotograma del fogonazo visible, o `null` (para pruebas). */
+  get flashFrame(): string | null {
+    return this.rig.flashFrame;
   }
 
   muzzle(): Point {
@@ -148,8 +152,7 @@ export class Player {
   /** Envía a la interfaz el estado inicial. */
   announce(): void {
     this.bus.emit('health', { current: this.health.current, max: this.health.max });
-    this.bus.emit('weapon', { name: this.weapon.def.name, icon: this.weapon.def.icon, slot: this.slot });
-    this.emitAmmo(true);
+    this.arms.announce();
   }
 
   /** Aplica las acciones del jugador. Devuelve un disparo si se ha producido. */
@@ -171,7 +174,8 @@ export class Player {
     // Puntería: Alex mira hacia el lado del ratón, con un margen para no oscilar.
     if (Math.abs(aimPoint.x - this.sprite.x) > 3) this.facing = aimPoint.x < this.sprite.x ? -1 : 1;
     const pivot = this.rig.shoulder(this.facing);
-    this.aim = aimAngleTowards(pivot.x, pivot.y, aimPoint.x, aimPoint.y, this.facing);
+    this.aimFree = aimDegreesTowards(pivot.x, pivot.y, aimPoint.x, aimPoint.y, this.facing);
+    this.aim = snapAimAngle(this.aimFree);
 
     // Movimiento con aceleración; aturdido tras un golpe no responde.
     const stunned = now < this.hurtUntil;
@@ -192,44 +196,19 @@ export class Player {
   }
 
   private updateWeapon(now: number, input: InputFrame): ShotRequest | null {
-    if (input.slotPressed !== null) this.selectSlot(input.slotPressed);
-    const weapon = this.weapon;
-
-    if (weapon.update(now)) playSfx(this.scene, SFX.dryFire, 0.35, 40);
-
-    if (input.reloadPressed) {
-      const result = weapon.startReload(now);
-      if (result === 'started') playSfx(this.scene, SFX.reload, 0.5, 40);
-      else if (result === 'no-reserve') this.bus.emit('notice', { text: 'SIN MUNICION DE RESERVA' });
-      else if (result === 'full') this.bus.emit('notice', { text: 'CARGADOR LLENO' });
-    }
-
-    const wantsFire = weapon.def.automatic ? input.fireHeld : input.firePressed;
-    if (!wantsFire) return null;
-
-    const result = weapon.tryFire(now);
-    if (result === 'empty' && input.firePressed) {
-      playSfx(this.scene, SFX.dryFire, 0.45, 60);
-      this.bus.emit('notice', { text: weapon.reserve > 0 ? 'CARGADOR VACIO - PULSA R' : 'SIN MUNICION' });
-    }
-    if (result !== 'fired') return null;
-
-    this.rig.fire(now);
-    const spread = spreadFrom(Math.random(), weapon.def.spreadDeg);
-    const direction = shotDirection(this.aim, this.facing, spread);
-    const muzzle = this.muzzle();
-    return { x: muzzle.x, y: muzzle.y, dirX: direction.x, dirY: direction.y, aim: this.aim, facing: this.facing, weapon: weapon.def };
-  }
-
-  private selectSlot(slot: number): void {
-    if (slot === this.slot) return;
-    if (!this.weapons[slot]) {
-      this.bus.emit('notice', { text: `RANURA ${slot + 1} VACIA` });
-      return;
-    }
-    this.weapon.cancelReload();
-    this.slot = slot;
-    this.bus.emit('weapon', { name: this.weapon.def.name, icon: this.weapon.def.icon, slot });
+    const shot = this.arms.update(now, input, {
+      aim: this.aim,
+      angle: this.aimFree,
+      facing: this.facing,
+      muzzle: this.muzzle(),
+    });
+    this.rig.setWeapon(this.weapon.def.id);
+    if (!shot) return null;
+    const recoil = shot.weapon.recoil;
+    this.rig.fire(now, recoil);
+    // El retroceso de las armas pesadas empuja a Alex hacia atrás.
+    if (recoil.pushBack > 0) this.body.setVelocityX(this.body.velocity.x - this.facing * recoil.pushBack);
+    return shot;
   }
 
   private updateAnimation(now: number, direction: number, onGround: boolean): void {
@@ -256,26 +235,14 @@ export class Player {
    * fogonazo, sombra) y avisa a la interfaz de los cambios.
    */
   postUpdate(now: number, groundY: number): void {
-    const progress = this.alive ? this.weapon.reloadProgress(now) : null;
-    this.rig.sync(this.facing, this.aim, now, progress);
+    const progress = this.arms.sync(now, this.alive);
+    this.rig.setWeapon(this.weapon.def.id);
+    this.rig.sync(this.facing, this.aim, now, progress, this.alive && this.arms.isSwitching(now));
     this.shadow.setPosition(this.sprite.x, groundY + 1);
     // Parpadeo mientras dura la invulnerabilidad.
     const blinking = this.alive && this.health.isInvulnerable(now);
     this.sprite.setAlpha(blinking && Math.floor(now / 70) % 2 === 0 ? 0.45 : 1);
 
-    this.emitAmmo(false);
-    if (progress !== this.lastReload) {
-      this.lastReload = progress;
-      this.bus.emit('reload', { progress });
-    }
-  }
-
-  private emitAmmo(force: boolean): void {
-    const weapon = this.weapon;
-    const key = `${this.slot}:${weapon.magazine}:${weapon.reserve}`;
-    if (!force && key === this.lastAmmoKey) return;
-    this.lastAmmoKey = key;
-    this.bus.emit('ammo', { magazine: weapon.magazine, magazineSize: weapon.def.magazineSize, reserve: weapon.reserve });
   }
 
   /** Recibe un golpe desde `fromX`. Devuelve `true` si hizo daño. */
@@ -293,16 +260,16 @@ export class Player {
   }
 
   private die(): void {
-    this.weapon.cancelReload();
+    this.arms.cancelReload();
     this.rig.setVisible(false);
     this.sprite.setAlpha(1);
     this.sprite.anims.play(this.anim('die'), true);
     this.hurtUntil = 0;
   }
 
-  /** Añade munición de reserva al arma equipada. Devuelve cuánta cupo. */
-  addAmmo(rounds: number): number {
-    return this.weapon.addReserve(rounds);
+  /** Recoge la munición de una caja. Devuelve a qué arma fue y cuánta, o `null` si no cabe. */
+  resupply(): Resupply<WeaponDef> | null {
+    return this.arms.resupply();
   }
 
   /** Mueve a Alex de golpe (pruebas y puntos de control). */

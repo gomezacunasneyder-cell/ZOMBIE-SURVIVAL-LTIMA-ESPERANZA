@@ -36,9 +36,11 @@ Resultados en [decisiones/0003-fase-2.md](decisiones/0003-fase-2.md), que incluy
 
 **Criterio:** una captura del juego ya transmite la dirección artística del GDD.
 
-### Fase 3 · Arsenal y supervivencia
+### Fase 3 · Arsenal y supervivencia — ARSENAL TERMINADO, pendiente de aprobación
 
-- Resto de armas, cambio de arma, arrojadizos.
+Arsenal y combate en [decisiones/0004-fase-3-arsenal.md](decisiones/0004-fase-3-arsenal.md): pistola, escopeta, fusil de asalto y ametralladora, cambio de arma y HUD de combate.
+
+- ~~Resto de armas, cambio de arma~~, arrojadizos.
 - Inventario, botiquines, piezas y objetos recogibles.
 - Helicóptero Cóndor 7 y cajas de suministro.
 

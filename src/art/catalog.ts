@@ -1,6 +1,7 @@
 import {
   AIM_ANGLES,
   paintAlexArm,
+  paintAlexArmWith,
   paintAlexDie,
   paintAlexFall,
   paintAlexHurt,
@@ -23,6 +24,17 @@ import {
 } from './painters/alexDetailed';
 import { DETAILED_RELOAD_FRAMES, paintDetailedArm, paintDetailedReload } from './painters/alexDetailedArm';
 import { SKINS, skinArmFrame, skinReloadFrame } from './skins';
+import {
+  BULLET_ANGLES,
+  FLASH_STYLES,
+  GUNS,
+  IMPACT_FRAMES,
+  paintGunFlash,
+  paintImpact,
+  paintPellet,
+  paintShell,
+  type FlashStyle,
+} from './painters/guns';
 import { paintApartmentFacade, paintShopFacade } from './painters/facades';
 import {
   EXPLOSION_FRAMES,
@@ -37,11 +49,16 @@ import {
 } from './painters/hazards';
 import { paintCityLights, paintCityNear, paintClouds, paintFog, paintNightSky } from './painters/skyline';
 import {
+  paintCrosshair,
   paintHealthIcon,
+  paintMachineGunIcon,
   paintPickupMarker,
   paintPistolIcon,
+  paintRifleIcon,
   paintRound,
+  paintShotgunIcon,
   paintSkullIcon,
+  paintThinRound,
 } from './painters/ui';
 import {
   FIRE_FRAMES,
@@ -111,9 +128,14 @@ export function aimFrame(kind: 'arm' | 'flash0' | 'flash1', angle: number): stri
   return `alex/${kind}/${angle}`;
 }
 
-/** Nombre del fotograma de bala para un ángulo de puntería. */
+/** Nombre del fotograma de bala para un ángulo (múltiplo de 5°, ver `bulletAngle`). */
 export function bulletFrame(angle: number): string {
   return `fx/bullet/${angle}`;
+}
+
+/** Fogonazo de un arma: el centro del fotograma es la boca del cañón. */
+export function gunFlashFrame(style: FlashStyle, stage: 0 | 1, angle: number): string {
+  return `fx/flash/${style}/${stage}/${angle}`;
 }
 
 /**
@@ -178,17 +200,34 @@ export function buildArtCatalog(): ArtCatalog {
     frameRate: 9,
     repeat: -1,
   });
-  for (const angle of AIM_ANGLES) sprites.set(skinArmFrame(detailed, angle), paintDetailedArm(angle));
-  const reload = paintDetailedReload();
-  if (reload.length !== DETAILED_RELOAD_FRAMES) throw new Error('Recarga: número de fotogramas inesperado');
-  reload.forEach((frame, i) => sprites.set(skinReloadFrame(detailed, i), frame));
-
   for (const angle of AIM_ANGLES) {
     sprites.set(aimFrame('arm', angle), paintAlexArm(angle));
     sprites.set(aimFrame('flash0', angle), paintMuzzleFlash(angle, 0));
     sprites.set(aimFrame('flash1', angle), paintMuzzleFlash(angle, 1));
-    sprites.set(bulletFrame(angle), paintBullet(angle));
   }
+
+  // Arsenal: brazo con cada arma en los dos aspectos, bombeo y recarga.
+  const classic = SKINS.clasico;
+  for (const [weapon, gun] of Object.entries(GUNS)) {
+    for (const angle of AIM_ANGLES) {
+      sprites.set(skinArmFrame(detailed, angle, weapon), paintDetailedArm(angle, weapon));
+      if (weapon !== 'pistol') sprites.set(skinArmFrame(classic, angle, weapon), paintAlexArmWith(angle, weapon));
+      if (gun.pump) {
+        sprites.set(skinArmFrame(detailed, angle, weapon, 'pump'), paintDetailedArm(angle, weapon, { pumpBack: true }));
+        sprites.set(skinArmFrame(classic, angle, weapon, 'pump'), paintAlexArmWith(angle, weapon, { pumpBack: true }));
+      }
+    }
+    const reload = paintDetailedReload(weapon);
+    if (reload.length !== DETAILED_RELOAD_FRAMES) throw new Error('Recarga: número de fotogramas inesperado');
+    reload.forEach((frame, i) => sprites.set(skinReloadFrame(detailed, i, weapon), frame));
+  }
+  for (const style of FLASH_STYLES) {
+    for (const angle of AIM_ANGLES) {
+      sprites.set(gunFlashFrame(style, 0, angle), paintGunFlash(angle, style, 0));
+      sprites.set(gunFlashFrame(style, 1, angle), paintGunFlash(angle, style, 1));
+    }
+  }
+  for (const angle of BULLET_ANGLES) sprites.set(bulletFrame(angle), paintBullet(angle));
 
   // Caminantes.
   for (const variant of WALKER_VARIANTS) {
@@ -238,6 +277,14 @@ export function buildArtCatalog(): ArtCatalog {
   sprites.set('fx/spark', new PixelBuffer(1, 1).fill(P.light2));
   sprites.set('fx/dust', new PixelBuffer(1, 1).fill(P.grey2));
   sprites.set('fx/casing', new PixelBuffer(2, 1).fill(P.yel2));
+  sprites.set('fx/shell', paintShell());
+  sprites.set('fx/pellet', paintPellet());
+  addAnimation(
+    'fx/impact',
+    Array.from({ length: IMPACT_FRAMES }, (_, i) => paintImpact(i)),
+    24,
+    0,
+  );
 
   // Fase 2: peligros, humo, papeles, sombras y fachadas.
   sprites.set('prop/fuel-barrel', paintFuelBarrel());
@@ -257,6 +304,12 @@ export function buildArtCatalog(): ArtCatalog {
 
   // Interfaz.
   sprites.set('ui/pistol', paintPistolIcon());
+  sprites.set('ui/shotgun', paintShotgunIcon());
+  sprites.set('ui/rifle', paintRifleIcon());
+  sprites.set('ui/mg', paintMachineGunIcon());
+  sprites.set('ui/round-thin', paintThinRound(true));
+  sprites.set('ui/round-thin-empty', paintThinRound(false));
+  sprites.set('ui/crosshair', paintCrosshair());
   sprites.set('ui/skull', paintSkullIcon());
   sprites.set('ui/health', paintHealthIcon());
   sprites.set('ui/round', paintRound(true));

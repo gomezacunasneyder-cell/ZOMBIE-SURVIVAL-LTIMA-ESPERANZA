@@ -31,8 +31,10 @@ Shooter de supervivencia 2D de desplazamiento lateral en pixel art. Phaser 3.90.
 
 Las pruebas de navegador usan `window.__ZS__` (solo en desarrollo). Esperar siempre por el **tiempo del juego** (`state().time`), no por tiempo real: con la máquina cargada el juego va más lento y las pausas fijas fallan. Las funciones que se pasan a `until()` se envían al navegador como texto y no pueden usar variables de la prueba.
 
-Parámetros de URL: `?test=1` (sin enemigos), `&hora=noche|atardecer|0.5`, `&skin=clasico`, `?scene=gallery`, `?scene=compare`.
+Parámetros de URL: `?test=1` (sin enemigos), `&hora=noche|atardecer|0.5`, `&skin=clasico`, `?scene=gallery`, `?scene=compare`, `?scene=arsenal`.
+
+Añadir un arma: datos en `src/content/weapons.ts`, dibujo en `src/art/painters/guns.ts` y voz en `src/audio/synth/gunshot.ts` (las pruebas avisan si falta alguna).
 
 ## Estado
 
-Fases 0, 1 y 2 completadas y aprobadas. Siguiente: Fase 3 (arsenal y supervivencia), pendiente de que el usuario la inicie.
+Fases 0, 1 y 2 completadas y aprobadas. Fase 3: el arsenal (4 armas, cambio de arma, HUD de combate) está terminado y **pendiente de aprobación** (`docs/decisiones/0004-fase-3-arsenal.md`); el resto de la Fase 3 (arrojadizos, inventario, botiquines, Cóndor 7) no se ha empezado. El usuario numeró este encargo como «Fase 2»: en el plan corresponde a la Fase 3.

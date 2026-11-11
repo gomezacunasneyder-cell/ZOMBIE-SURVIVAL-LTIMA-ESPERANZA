@@ -1,5 +1,4 @@
 import type Phaser from 'phaser';
-import { AMMO_PICKUP_AMOUNT } from '../../content/weapons';
 import type { EventBus, GameEvents } from '../../core/events/EventBus';
 import { ATLAS_KEY } from '../boot/registerArt';
 import { SFX, playSfx } from '../boot/registerAudio';
@@ -43,10 +42,10 @@ export class PickupSystem {
     for (let i = this.pickups.length - 1; i >= 0; i--) {
       const pickup = this.pickups[i] as Pickup;
       if (Math.abs(pickup.x - player.x) > REACH) continue;
-      const added = player.addAmmo(AMMO_PICKUP_AMOUNT);
-      if (added <= 0) continue;
+      const supply = player.resupply();
+      if (!supply) continue;
       playSfx(this.scene, SFX.pickup, 0.45, 0);
-      this.bus.emit('notice', { text: `MUNICION +${added}` });
+      this.bus.emit('notice', { text: `${supply.def.ammoName} +${supply.added}` });
       pickup.crate.destroy();
       pickup.marker.destroy();
       this.pickups.splice(i, 1);

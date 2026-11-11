@@ -1,3 +1,4 @@
+import { ARM_CANVAS, ARM_PIVOT, gunArt, type GunPose } from './guns';
 import { AIM_ANGLES } from '../../core/combat/aim';
 import { PixelBuffer } from '../PixelBuffer';
 import { P } from '../palette';
@@ -162,8 +163,7 @@ export function paintAlexDie(): HumanoidFrame[] {
 }
 
 /** Lienzo de las capas de brazo y fogonazo; el hombro queda en su centro. */
-export const ARM_CANVAS = 48;
-export const ARM_PIVOT = ARM_CANVAS / 2;
+export { ARM_CANVAS, ARM_PIVOT };
 /** Distancia del hombro a la boca del cañón, en píxeles. */
 export const MUZZLE_DISTANCE = 13;
 
@@ -214,6 +214,35 @@ export function paintAlexArm(angleDeg: number): PixelBuffer {
   const [kx, ky] = at(6, 1);
   buf.set(kx, ky, P.skin2);
 
+  return buf.outline(P.outline);
+}
+
+/**
+ * Brazo clásico con un arma larga (o la pistola en otra pose): la misma
+ * manga del aspecto clásico y el arma común de `guns.ts`.
+ */
+export function paintAlexArmWith(angleDeg: number, weapon: string, pose: GunPose = {}): PixelBuffer {
+  if (weapon === 'pistol' && !pose.pumpBack && pose.magazine !== false) return paintAlexArm(angleDeg);
+  const buf = new PixelBuffer(ARM_CANVAS, ARM_CANVAS);
+  const gun = gunArt(weapon);
+  const { dx, dy, px, py } = aimVectors(angleDeg);
+  const at = (dist: number, side = 0): [number, number] => [
+    ARM_PIVOT + dx * dist + px * side,
+    ARM_PIVOT + dy * dist + py * side,
+  ];
+  gun.back?.(buf, angleDeg, pose);
+  const [sx, sy] = at(0);
+  const [hx, hy] = at(6);
+  buf.line(sx, sy, hx, hy, P.blue2, 2);
+  const [ex, ey] = at(3);
+  buf.line(sx, sy, ex, ey, P.blue1, 1);
+  gun.front(buf, angleDeg, pose);
+  buf.rect(Math.round(hx), Math.round(hy), 2, 2, P.skin1);
+  const support = gun.supportHand(pose);
+  if (support) {
+    const [fx, fy] = at(support[0], support[1] + 0.5);
+    buf.rect(Math.round(fx), Math.round(fy), 2, 2, P.skin1);
+  }
   return buf.outline(P.outline);
 }
 

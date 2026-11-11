@@ -63,7 +63,7 @@ export class PreloadScene extends Phaser.Scene {
 
     const options = readLaunchOptions(window.location.search);
     this.registry.set('launch', options);
-    const target = { game: SCENE.game, gallery: SCENE.gallery, compare: SCENE.compare }[options.scene];
+    const target = { game: SCENE.game, gallery: SCENE.gallery, compare: SCENE.compare, arsenal: SCENE.arsenal }[options.scene];
     this.scene.start(target);
   }
 }

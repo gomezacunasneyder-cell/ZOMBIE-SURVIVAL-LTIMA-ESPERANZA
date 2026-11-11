@@ -31,3 +31,21 @@ export function aimAngleTowards(
   const up = shoulderY - targetY;
   return snapAimAngle((Math.atan2(up, forward) * 180) / Math.PI);
 }
+
+/**
+ * Ángulo libre (sin ajustar a los 7 dibujos) desde el hombro hacia un
+ * punto, entre -90 y 90. Las balas salen hacia aquí: el brazo se dibuja
+ * con el ángulo ajustado más cercano, pero el disparo va al cursor.
+ */
+export function aimDegreesTowards(
+  shoulderX: number,
+  shoulderY: number,
+  targetX: number,
+  targetY: number,
+  facing: 1 | -1,
+): number {
+  const forward = Math.max(0, (targetX - shoulderX) * facing);
+  const up = shoulderY - targetY;
+  if (forward === 0 && up === 0) return 0;
+  return (Math.atan2(up, forward) * 180) / Math.PI;
+}

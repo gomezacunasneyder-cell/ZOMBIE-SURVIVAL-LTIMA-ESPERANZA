@@ -96,3 +96,38 @@ export function synthPickup(sampleRate = 44100): SynthSound {
     return Math.sin(Math.PI * 2 * freq * t) * Math.exp(-local * 18) * 0.4;
   });
 }
+
+/** Corredera de la escopeta: atrás y adelante, dos golpes graves de madera y metal. */
+export function synthPump(sampleRate = 44100): SynthSound {
+  const rng = new Rng(21);
+  return render(sampleRate, 0.32, (t) => {
+    const n = rng.next() * 2 - 1;
+    return (click(t, 0, n, 420) * 1.1 + click(t, 0.15, n, 520) * 1.2) * 0.6;
+  });
+}
+
+/** Cambio de arma: roce de tela y un clic de seguro. */
+export function synthEquip(sampleRate = 44100): SynthSound {
+  const rng = new Rng(22);
+  let soft = 0;
+  return render(sampleRate, 0.2, (t) => {
+    soft += 0.08 * (rng.next() * 2 - 1 - soft);
+    const rustle = soft * Math.exp(-t * 18) * 1.4;
+    return (rustle + click(t, 0.12, rng.next() * 2 - 1, 1300) * 0.7) * 0.6;
+  });
+}
+
+/** Recarga de un arma larga: soltar el cargador, encajar el nuevo y tirar del cerrojo. */
+export function synthRifleReload(sampleRate = 44100): SynthSound {
+  const rng = new Rng(23);
+  return render(sampleRate, 0.9, (t) => {
+    const n = rng.next() * 2 - 1;
+    return (click(t, 0.02, n, 700) + click(t, 0.42, n, 560) * 1.2 + click(t, 0.7, n, 1100) + click(t, 0.78, n, 900) * 0.9) * 0.55;
+  });
+}
+
+/** Cartucho que entra en el depósito de la escopeta. */
+export function synthShellInsert(sampleRate = 44100): SynthSound {
+  const rng = new Rng(24);
+  return render(sampleRate, 0.12, (t) => click(t, 0, rng.next() * 2 - 1, 760) * 0.6);
+}
