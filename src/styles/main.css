@@ -1,0 +1,37 @@
+:root {
+  --marco: #0d0b11;
+  --marco-borde: #1d1a22;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--marco);
+  overflow: hidden;
+}
+
+#game-root {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(ellipse at center, #17141d 0%, var(--marco) 70%);
+}
+
+/* El lienzo se amplía solo por múltiplos enteros de píxel físico (ver integerScale.ts). */
+#game-root canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  outline: 1px solid var(--marco-borde);
+  cursor: crosshair;
+}
