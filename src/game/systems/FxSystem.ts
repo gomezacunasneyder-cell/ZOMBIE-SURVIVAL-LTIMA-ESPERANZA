@@ -90,8 +90,14 @@ export class FxSystem {
     this.sparks.explode(7, x, y);
   }
 
-  dustPuff(x: number, y: number): void {
-    this.dust.explode(5, x, y);
+  dustPuff(x: number, y: number, count = 5): void {
+    this.dust.explode(count, x, y);
+  }
+
+  /** Astillas y polvo de una barricada golpeada. */
+  debris(x: number, y: number, count: number): void {
+    this.sparks.explode(Math.ceil(count / 3), x, y);
+    this.dust.explode(count, x, y);
   }
 
   casing(x: number, y: number, facing: 1 | -1, kind: 'casing' | 'shell' = 'casing'): void {

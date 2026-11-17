@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { synthBarricadeBreak, synthClicks, synthRoar, synthScreech, synthSlam } from '../../audio/synth/creatures';
 import { GUN_VOICES, synthGunshot, type SynthSound } from '../../audio/synth/gunshot';
 import { WEAPONS } from '../../content/weapons';
 import { synthDeathCry, synthExplosion, synthFootstep, synthSnarl, synthZap } from '../../audio/synth/impacts';
@@ -23,6 +24,15 @@ import {
   synthRifleReload,
   synthShellInsert,
 } from '../../audio/synth/sfx';
+import {
+  synthChute,
+  synthCrateLand,
+  synthCrateOpen,
+  synthFlare,
+  synthMedkit,
+  synthRadioAlarm,
+  synthRadioChatter,
+} from '../../audio/synth/supplies';
 import { positional } from '../../core/settings/audioSettings';
 import { audioState } from '../audio/audioState';
 import { GAME_WIDTH } from '../config';
@@ -46,6 +56,18 @@ export const SFX = {
   equip: 'sfx/equip',
   rifleReload: 'sfx/rifle-reload',
   shellInsert: 'sfx/shell-insert',
+  clicks: 'sfx/clicks',
+  screech: 'sfx/screech',
+  roar: 'sfx/roar',
+  slam: 'sfx/slam',
+  barricadeBreak: 'sfx/barricade-break',
+  radioAlarm: 'sfx/radio-alarm',
+  radioChatter: 'sfx/radio-chatter',
+  chute: 'sfx/chute',
+  crateLand: 'sfx/crate-land',
+  crateOpen: 'sfx/crate-open',
+  flare: 'sfx/flare',
+  medkit: 'sfx/medkit',
 } as const;
 
 /** Disparo propio de cada arma: `sfx/shot/<id>`. */
@@ -94,6 +116,18 @@ const RECIPES: Record<SfxKey | LoopKey, Recipe> = {
   [SFX.equip]: synthEquip,
   [SFX.rifleReload]: synthRifleReload,
   [SFX.shellInsert]: synthShellInsert,
+  [SFX.clicks]: synthClicks,
+  [SFX.screech]: synthScreech,
+  [SFX.roar]: synthRoar,
+  [SFX.slam]: synthSlam,
+  [SFX.barricadeBreak]: synthBarricadeBreak,
+  [SFX.radioAlarm]: synthRadioAlarm,
+  [SFX.radioChatter]: synthRadioChatter,
+  [SFX.chute]: synthChute,
+  [SFX.crateLand]: synthCrateLand,
+  [SFX.crateOpen]: synthCrateOpen,
+  [SFX.flare]: synthFlare,
+  [SFX.medkit]: synthMedkit,
   [LOOP.wind]: synthWindLoop,
   [LOOP.helicopter]: synthHelicopterLoop,
   [LOOP.alarm]: synthAlarmLoop,

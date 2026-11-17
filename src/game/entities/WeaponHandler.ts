@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
-import { STARTING_LOADOUT, WEAPON_SWITCH_MS, type WeaponDef } from '../../content/weapons';
+import { STARTING_LOADOUT, WEAPON_SWITCH_MS, slotOf, type WeaponDef } from '../../content/weapons';
 import type { AimAngle } from '../../core/combat/aim';
-import { Arsenal, type Resupply } from '../../core/combat/Arsenal';
+import { Arsenal, type GrantResult, type Resupply } from '../../core/combat/Arsenal';
 import { pelletSpreads, shotDirection, type Vector } from '../../core/combat/ballistics';
 import type { WeaponState } from '../../core/combat/WeaponState';
 import type { EventBus, GameEvents } from '../../core/events/EventBus';
@@ -20,11 +20,16 @@ export interface ShotRequest {
   angle: number;
   facing: 1 | -1;
   weapon: WeaponDef;
+  /** Hombro de Alex: con un enemigo pegado, el impacto se resuelve entre el hombro y la boca. */
+  fromX: number;
+  fromY: number;
 }
 
 /** Cómo suena la recarga de cada arma. */
 type ReloadVoice = 'clip' | 'shells' | 'long';
-const RELOAD_VOICE: Readonly<Record<string, ReloadVoice>> = { shotgun: 'shells', rifle: 'long', mg: 'long' };
+const RELOAD_VOICE: Readonly<Record<string, ReloadVoice>> = { shotgun: 'shells', rifle: 'long', mg: 'long', flamer: 'long', rocket: 'long' };
+/** El lanzallamas dispara cada 70 ms: su soplido suena como mucho cada tanto. */
+const FLAME_SOUND_GAP_MS = 190;
 /** Bombeo de la escopeta tras cada disparo. */
 const PUMP_SOUND_DELAY_MS = 180;
 
@@ -35,6 +40,7 @@ export interface AimInput {
   angle: number;
   facing: 1 | -1;
   muzzle: Point;
+  shoulder: Point;
 }
 
 /**
@@ -43,15 +49,19 @@ export interface AimInput {
  * eventos para el HUD. No mueve sprites: eso es cosa de `AimRig`.
  */
 export class WeaponHandler {
-  readonly arsenal = new Arsenal<WeaponDef>(STARTING_LOADOUT, WEAPON_SWITCH_MS);
+  readonly arsenal: Arsenal<WeaponDef>;
   private lastAmmoKey = '';
+  private lastFlameSound = -Infinity;
   private lastReload: number | null = null;
   private reloadTicks = 0;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly bus: EventBus<GameEvents>,
-  ) {}
+    loadout: readonly (WeaponDef | null)[] = STARTING_LOADOUT,
+  ) {
+    this.arsenal = new Arsenal<WeaponDef>(loadout, WEAPON_SWITCH_MS);
+  }
 
   get weapon(): WeaponState<WeaponDef> {
     return this.arsenal.current;
@@ -68,7 +78,7 @@ export class WeaponHandler {
   }
 
   /** Aplica cambio de arma, recarga y gatillo. Devuelve el disparo si lo hay. */
-  update(now: number, input: InputFrame, aim: AimInput): ShotRequest | null {
+  update(now: number, input: InputFrame, aim: AimInput, busy = false): ShotRequest | null {
     if (input.slotPressed !== null) this.select(input.slotPressed, now);
     else if (input.cycle !== 0) this.cycle(input.cycle, now);
 
@@ -79,6 +89,8 @@ export class WeaponHandler {
       playSfx(this.scene, reloadVoice === 'shells' ? SFX.pump : SFX.dryFire, 0.4, 40);
     }
 
+    // Con las manos ocupadas (botiquín) ni se recarga ni se dispara.
+    if (busy) return null;
     if (input.reloadPressed) this.reload(now, reloadVoice);
 
     // Un toque rápido también dispara con las automáticas (pulsar y soltar en el mismo fotograma).
@@ -93,14 +105,27 @@ export class WeaponHandler {
     if (result !== 'fired') return null;
 
     const def = weapon.def;
-    playSfx(this.scene, shotSfx(def.id), def.id === 'mg' ? 0.42 : 0.5, 150);
+    if (def.projectile !== 'flame' || now - this.lastFlameSound >= FLAME_SOUND_GAP_MS) {
+      if (def.projectile === 'flame') this.lastFlameSound = now;
+      playSfx(this.scene, shotSfx(def.id), def.id === 'mg' ? 0.42 : def.id === 'rocket' ? 0.6 : 0.5, 150);
+    }
     if (RELOAD_VOICE[def.id] === 'shells') {
       this.scene.time.delayedCall(PUMP_SOUND_DELAY_MS, () => playSfx(this.scene, SFX.pump, 0.4, 60));
     }
     const directions = pelletSpreads(def.pellets, def.spreadDeg, Math.random).map((spread) =>
       shotDirection(aim.angle, aim.facing, spread),
     );
-    return { x: aim.muzzle.x, y: aim.muzzle.y, directions, aim: aim.aim, angle: aim.angle, facing: aim.facing, weapon: def };
+    return {
+      x: aim.muzzle.x,
+      y: aim.muzzle.y,
+      directions,
+      aim: aim.aim,
+      angle: aim.angle,
+      facing: aim.facing,
+      weapon: def,
+      fromX: aim.shoulder.x,
+      fromY: aim.shoulder.y,
+    };
   }
 
   private reload(now: number, voice: ReloadVoice): void {
@@ -154,6 +179,24 @@ export class WeaponHandler {
     const result = this.arsenal.resupply();
     if (result) this.emitAmmo(true);
     return result;
+  }
+
+  /**
+   * Recibe un arma de una caja: si es nueva la equipa en su ranura; si ya
+   * la tenía, se convierte en munición para ella.
+   */
+  grant(def: WeaponDef, now: number): GrantResult {
+    const result = this.arsenal.grant(def, slotOf(def.id));
+    if (result.kind === 'new' && this.arsenal.select(result.slot, now) === 'switched') this.onSwitched();
+    else this.emitAmmo(true);
+    return result;
+  }
+
+  /** Munición para un arma concreta. Devuelve cuánta cupo. */
+  addAmmo(weaponId: string, rounds: number): number {
+    const added = this.arsenal.addAmmo(weaponId, rounds);
+    if (added > 0) this.emitAmmo(true);
+    return added;
   }
 
   /** Avisa a la interfaz de los cambios de munición y recarga del fotograma. */

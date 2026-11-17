@@ -36,19 +36,23 @@ Resultados en [decisiones/0003-fase-2.md](decisiones/0003-fase-2.md), que incluy
 
 **Criterio:** una captura del juego ya transmite la dirección artística del GDD.
 
-### Fase 3 · Arsenal y supervivencia — ARSENAL TERMINADO, pendiente de aprobación
+### Fase 3 · Arsenal y supervivencia — ARSENAL aprobado · SUMINISTROS terminados, pendientes de aprobación
 
 Arsenal y combate en [decisiones/0004-fase-3-arsenal.md](decisiones/0004-fase-3-arsenal.md): pistola, escopeta, fusil de asalto y ametralladora, cambio de arma y HUD de combate.
 
+Suministros en [decisiones/0006-fase-3-suministros.md](decisiones/0006-fase-3-suministros.md): Cóndor 7, cajas en paracaídas con botín por rarezas, botiquines, lanzallamas y lanzacohetes.
+
 - ~~Resto de armas, cambio de arma~~, arrojadizos.
-- Inventario, botiquines, piezas y objetos recogibles.
-- Helicóptero Cóndor 7 y cajas de suministro.
+- ~~Botiquines~~; inventario (Tab), piezas y objetos recogibles.
+- ~~Helicóptero Cóndor 7 y cajas de suministro.~~
 
-### Fase 4 · Enemigos y hordas
+### Fase 4 · Enemigos y hordas — TERMINADA, pendiente de aprobación
 
-- Corredor, blindado y Eco.
-- Sistema de ruido completo y medidor en el HUD.
-- Director de oleadas, modo Oleadas y escena de estrés de rendimiento.
+Enemigos e IA en [decisiones/0005-fase-4-enemigos.md](decisiones/0005-fase-4-enemigos.md): caminante, corredor, Chasqueador y mutante con IA común por comportamientos, ruido y sigilo.
+
+- ~~Corredor y Eco~~ (hechos como corredor y Chasqueador; además el mutante). Blindado pendiente.
+- ~~Sistema de ruido completo y medidor en el HUD.~~
+- ~~Director de oleadas, modo Oleadas y escena de estrés de rendimiento.~~ En [decisiones/0007-fase-4-oleadas.md](decisiones/0007-fase-4-oleadas.md): cinco oleadas, horda final con defensa de barricadas, llegada del jefe y reutilización de enemigos. **150 zombis a 2,5 ms por fotograma.**
 
 **Criterio:** 150 zombis activos dentro del presupuesto de rendimiento.
 

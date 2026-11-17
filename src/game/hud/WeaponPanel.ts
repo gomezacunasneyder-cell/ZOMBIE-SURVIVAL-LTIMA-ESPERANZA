@@ -11,7 +11,7 @@ export const PANEL = { width: 156, height: 42 };
 const ROUNDS = { dx: 40, dy: 15, width: 76 };
 const BIG_PIPS = 12;
 const THIN_PIPS = 36;
-const SLOT = { dx: 5, dy: 29, size: 9, gap: 2 };
+const SLOT = { dx: 5, dy: 29, size: 8, gap: 1 };
 const RELOAD_BAR = { dx: 112, dy: 32, width: 38 };
 
 /**
@@ -19,7 +19,7 @@ const RELOAD_BAR = { dx: 112, dy: 32, width: 38 };
  *
  *   [icono]  NOMBRE DEL ARMA          12 /36
  *            ▮▮▮▮▮▮▮▮▮▮▮▮               RES
- *   [1][2][3][4]  RECARGANDO     [██████    ]
+ *   [1][2][3][4][5][6] RECARGANDO [█████   ]
  *
  * El cargador se dibuja bala a bala (grandes hasta 12, finas hasta 36) o
  * como barra en la ametralladora. Las ranuras se iluminan la activa y se
@@ -73,7 +73,7 @@ export class WeaponPanel {
     this.slotBoxes = scene.add.graphics();
     for (let i = 0; i < WEAPON_SLOTS; i++) {
       const left = x + SLOT.dx + i * (SLOT.size + SLOT.gap);
-      this.slotTexts.push(text(left + 3, y + SLOT.dy + 2, String(i + 1)));
+      this.slotTexts.push(text(left + 2, y + SLOT.dy + 2, String(i + 1)));
     }
     this.reloadBar = scene.add.graphics();
     this.reloadLabel = text(x + SLOT.dx + WEAPON_SLOTS * (SLOT.size + SLOT.gap) + 4, y + SLOT.dy + 2, '').setVisible(false);

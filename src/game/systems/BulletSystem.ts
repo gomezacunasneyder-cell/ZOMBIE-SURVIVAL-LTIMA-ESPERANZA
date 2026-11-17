@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { bulletFrame } from '../../art/catalog';
 import { bulletAngle } from '../../art/painters/guns';
+import { FLAME_FRAMES, flameFrame, rocketFrame } from '../../art/supplyArt';
+import type { BlastDef, BurnDef, WeaponDef } from '../../content/weapons';
 import { damageAtDistance, travelTimeMs, type FalloffRules } from '../../core/combat/ballistics';
 import { ATLAS_KEY } from '../boot/registerArt';
 import { GAME_WIDTH } from '../config';
@@ -15,9 +17,31 @@ export interface BulletData {
   dirX: number;
   originX: number;
   originY: number;
+  /** Red de seguridad por si la bala se queda atascada; el alcance se mide en distancia. */
   diesAt: number;
   weaponId: string;
+  projectile: WeaponDef['projectile'];
+  /** Llamas: enemigos ya alcanzados por esta bocanada (atraviesa, pero daña una vez a cada uno). */
+  touched: Set<object>;
+  burn?: BurnDef;
+  blast?: BlastDef;
+  /** Siguiente bocanada de humo de la estela del cohete. */
+  nextTrailAt: number;
 }
+
+export interface BulletHooks {
+  /** Altura del suelo: el cohete estalla al tocarlo y las llamas se apagan. */
+  groundY: number;
+  /** Un cohete agota su alcance o toca el suelo. */
+  rocketSpent(x: number, y: number, data: BulletData): void;
+  /** Estela de humo del cohete. */
+  rocketTrail(x: number, y: number): void;
+}
+
+/** Cada cuánto suelta humo el cohete. */
+const TRAIL_EVERY_MS = 35;
+/** Las llamas suben un poco mientras avanzan. */
+const FLAME_RISE = 16;
 
 /** Suficiente para una ráfaga de ametralladora y dos disparos de escopeta a la vez. */
 const MAX_BULLETS = 96;
@@ -31,7 +55,10 @@ const MAX_BULLETS = 96;
 export class BulletSystem {
   readonly group: Phaser.Physics.Arcade.Group;
 
-  constructor(private readonly scene: Phaser.Scene) {
+  constructor(
+    private readonly scene: Phaser.Scene,
+    private readonly hooks: BulletHooks,
+  ) {
     this.group = scene.physics.add.group({
       classType: Phaser.Physics.Arcade.Image,
       maxSize: MAX_BULLETS,
@@ -70,7 +97,14 @@ export class BulletSystem {
   private launch(shot: ShotRequest, dirX: number, dirY: number, now: number): boolean {
     const weapon = shot.weapon;
     const angle = (Math.atan2(-dirY, Math.abs(dirX)) * 180) / Math.PI;
-    const frame = weapon.projectile === 'pellet' ? 'fx/pellet' : bulletFrame(bulletAngle(angle));
+    const frame =
+      weapon.projectile === 'pellet'
+        ? 'fx/pellet'
+        : weapon.projectile === 'flame'
+          ? flameFrame(0)
+          : weapon.projectile === 'rocket'
+            ? rocketFrame(bulletAngle(angle))
+            : bulletFrame(bulletAngle(angle));
     const bullet = this.group.get(shot.x, shot.y, ATLAS_KEY, frame) as Phaser.Physics.Arcade.Image | null;
     if (!bullet) return false;
 
@@ -79,8 +113,11 @@ export class BulletSystem {
     bullet.setFlipX(dirX < 0).setDepth(DEPTH.bullet);
     const body = bullet.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
-    body.setSize(3, 3);
-    bullet.setVelocity(dirX * weapon.bulletSpeed, dirY * weapon.bulletSpeed);
+    const size = weapon.projectile === 'flame' ? 7 : weapon.projectile === 'rocket' ? 4 : 3;
+    body.setSize(size, size);
+    const rise = weapon.projectile === 'flame' ? FLAME_RISE : 0;
+    bullet.setVelocity(dirX * weapon.bulletSpeed, dirY * weapon.bulletSpeed - rise);
+    bullet.setAlpha(1);
 
     const data: BulletData = {
       falloff: weapon,
@@ -88,8 +125,13 @@ export class BulletSystem {
       dirX: dirX >= 0 ? 1 : -1,
       originX: shot.x,
       originY: shot.y,
-      diesAt: now + travelTimeMs(weapon.rangePx, weapon.bulletSpeed),
+      diesAt: now + travelTimeMs(weapon.rangePx, weapon.bulletSpeed) * 4,
       weaponId: weapon.id,
+      projectile: weapon.projectile,
+      touched: new Set(),
+      ...(weapon.burn ? { burn: weapon.burn } : {}),
+      ...(weapon.blast ? { blast: weapon.blast } : {}),
+      nextTrailAt: now,
     };
     bullet.setData('bullet', data);
     return true;
@@ -124,7 +166,31 @@ export class BulletSystem {
       const bullet = child as Phaser.Physics.Arcade.Image;
       if (!bullet.active) continue;
       const data = BulletSystem.dataOf(bullet);
-      if (now >= data.diesAt || bullet.x < left || bullet.x > right || bullet.y < -20) this.remove(bullet);
+      // El alcance se mide en distancia recorrida, no en tiempo: con el equipo
+      // cargado la física avanza menos que el reloj y las balas no deben
+      // perder alcance por ello.
+      const travelled = Math.hypot(bullet.x - data.originX, bullet.y - data.originY);
+      const spent = travelled >= data.falloff.rangePx || now >= data.diesAt;
+      const grounded = bullet.y >= this.hooks.groundY;
+      if (data.projectile === 'flame') {
+        // La bocanada crece y se apaga a medida que avanza.
+        const age = Math.floor((travelled / data.falloff.rangePx) * FLAME_FRAMES);
+        bullet.setFrame(flameFrame(age));
+      }
+      if (data.projectile === 'rocket') {
+        if (spent || grounded) {
+          this.remove(bullet);
+          this.hooks.rocketSpent(bullet.x, Math.min(bullet.y, this.hooks.groundY - 4), data);
+          continue;
+        }
+        if (now >= data.nextTrailAt) {
+          data.nextTrailAt = now + TRAIL_EVERY_MS;
+          this.hooks.rocketTrail(bullet.x - data.dirX * 5, bullet.y);
+        }
+      }
+      // El cohete sigue fuera de la vista hasta estallar: se oye aunque no se vea.
+      const offscreen = bullet.x < left || bullet.x > right || bullet.y < -20;
+      if (spent || grounded || (offscreen && data.projectile !== 'rocket')) this.remove(bullet);
     }
   }
 }

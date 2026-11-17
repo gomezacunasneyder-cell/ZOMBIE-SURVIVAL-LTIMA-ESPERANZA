@@ -7,10 +7,15 @@ import { GUN_VOICES, synthGunshot } from '../../src/audio/synth/gunshot';
 import { WALKER } from '../../src/content/enemies';
 import {
   ASSAULT_RIFLE,
+  BASIC_LOADOUT,
+  FLAMETHROWER,
+  FULL_LOADOUT,
   MACHINE_GUN,
   PISTOL,
+  ROCKET_LAUNCHER,
   SHOTGUN,
   STARTING_LOADOUT,
+  slotOf,
   WEAPONS,
   WEAPON_SLOTS,
   WEAPON_SWITCH_MS,
@@ -23,12 +28,16 @@ import { WeaponState } from '../../src/core/combat/WeaponState';
 import { Rng } from '../../src/core/math/Rng';
 
 const catalog = buildArtCatalog();
-const arsenal = (): Arsenal<WeaponDef> => new Arsenal(STARTING_LOADOUT, WEAPON_SWITCH_MS);
+const arsenal = (): Arsenal<WeaponDef> => new Arsenal(BASIC_LOADOUT, WEAPON_SWITCH_MS);
 
-describe('definición de las cuatro armas', () => {
-  it('las ranuras 1–4 son pistola, escopeta, fusil y ametralladora', () => {
-    expect(STARTING_LOADOUT).toHaveLength(WEAPON_SLOTS);
-    expect(STARTING_LOADOUT).toEqual([PISTOL, SHOTGUN, ASSAULT_RIFLE, MACHINE_GUN]);
+describe('definición de las seis armas', () => {
+  it('las ranuras 1–6 son pistola, escopeta, fusil, ametralladora, lanzallamas y lanzacohetes', () => {
+    expect(WEAPON_SLOTS).toBe(6);
+    expect(FULL_LOADOUT).toEqual([PISTOL, SHOTGUN, ASSAULT_RIFLE, MACHINE_GUN, FLAMETHROWER, ROCKET_LAUNCHER]);
+    expect(BASIC_LOADOUT).toEqual([PISTOL, SHOTGUN, ASSAULT_RIFLE, MACHINE_GUN, null, null]);
+    for (const w of WEAPONS) expect(FULL_LOADOUT[slotOf(w.id)]).toBe(w);
+    // Alex empieza solo con la pistola: el resto sale de los suministros.
+    expect(STARTING_LOADOUT).toEqual([PISTOL, null, null, null, null, null]);
     expect(new Set(WEAPONS.map((w) => w.id)).size).toBe(WEAPONS.length);
   });
 
@@ -57,7 +66,10 @@ describe('definición de las cuatro armas', () => {
     expect(MACHINE_GUN.automatic).toBe(true);
     // Papeles distintos: la ametralladora es la más rápida, la escopeta la de menos alcance.
     expect(MACHINE_GUN.fireIntervalMs).toBeLessThan(ASSAULT_RIFLE.fireIntervalMs);
-    expect(Math.min(...WEAPONS.map((w) => w.rangePx))).toBe(SHOTGUN.rangePx);
+    // De las armas de bala, la escopeta es la de menos alcance; el lanzallamas aún menos.
+    const firearms = WEAPONS.filter((w) => w.projectile === 'bullet' || w.projectile === 'pellet');
+    expect(Math.min(...firearms.map((w) => w.rangePx))).toBe(SHOTGUN.rangePx);
+    expect(FLAMETHROWER.rangePx).toBeLessThan(SHOTGUN.rangePx);
   });
 
   it('equilibrio frente al caminante', () => {

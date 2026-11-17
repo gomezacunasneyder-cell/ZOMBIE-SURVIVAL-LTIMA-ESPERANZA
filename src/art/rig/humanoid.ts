@@ -24,6 +24,11 @@ export interface Proportions {
   torsoHalf: number;
   upperArm: number;
   forearm: number;
+  /** Columna de la cadera; por defecto `HIP_X`. Las figuras grandes la centran en su lienzo. */
+  hipX?: number;
+  /** Grosor de brazos y piernas en píxeles; por defecto 2 y 3. */
+  armWidth?: number;
+  legWidth?: number;
 }
 
 /** Proporciones originales: fotograma de 32×32, figura de 27 px. */
@@ -124,15 +129,30 @@ interface LegStyle {
   tall: boolean;
 }
 
+/** Ensancha una brocha de 3 tonos repitiendo los extremos (sombra a un lado, luz al otro). */
+function widen(brush: readonly number[], width: number): number[] {
+  if (width <= brush.length) return [...brush];
+  const extra = width - brush.length;
+  const left = Math.floor(extra / 2);
+  return [
+    ...Array.from({ length: left }, () => brush[0] as number),
+    ...brush,
+    ...Array.from({ length: extra - left }, () => brush[brush.length - 1] as number),
+  ];
+}
+
 function drawLeg(buf: PixelBuffer, hip: Point, pose: LimbPose, p: Proportions, style: LegStyle): void {
   const { knee, ankle } = legPoints(hip, pose, p);
-  buf.brushLine(hip.x, hip.y, knee.x, knee.y, style.brush);
-  buf.brushLine(knee.x, knee.y, ankle.x, ankle.y - 1, style.brush);
+  const brush = widen(style.brush, p.legWidth ?? 3);
+  buf.brushLine(hip.x, hip.y, knee.x, knee.y, brush);
+  buf.brushLine(knee.x, knee.y, ankle.x, ankle.y - 1, brush);
   const ax = Math.round(ankle.x);
   const ay = Math.round(ankle.y);
-  if (style.tall) buf.rect(ax - 1, ay - 1, 3, 1, style.boot);
-  buf.rect(ax - 1, ay, 4, 1, style.boot);
-  buf.rect(ax - 1, ay + 1, 4, 1, style.sole);
+  // Pie proporcional al grosor de la pierna (4 px en las figuras normales).
+  const foot = (p.legWidth ?? 3) + 1;
+  if (style.tall) buf.rect(ax - 1, ay - 1, foot - 1, 1, style.boot);
+  buf.rect(ax - 1, ay, foot, 1, style.boot);
+  buf.rect(ax - 1, ay + 1, foot, 1, style.sole);
   // Rodilla marcada con el tono claro para dar volumen.
   buf.set(Math.round(knee.x) + 1, Math.round(knee.y), style.brush[style.brush.length - 1] as number);
 }
@@ -147,9 +167,10 @@ function drawArm(
 ): void {
   const elbow = polar(shoulder, pose.upper, p.upperArm);
   const wrist = polar(elbow, pose.upper + pose.bend, p.forearm);
-  buf.line(shoulder.x, shoulder.y, elbow.x, elbow.y, sleeve, 2);
-  buf.line(elbow.x, elbow.y, wrist.x, wrist.y, sleeve, 2);
-  buf.rect(Math.round(wrist.x), Math.round(wrist.y), 2, 2, hand);
+  const width = p.armWidth ?? 2;
+  buf.line(shoulder.x, shoulder.y, elbow.x, elbow.y, sleeve, width);
+  buf.line(elbow.x, elbow.y, wrist.x, wrist.y, sleeve, width);
+  buf.rect(Math.round(wrist.x), Math.round(wrist.y), width + (width > 2 ? 1 : 0), width + (width > 2 ? 1 : 0), hand);
 }
 
 /** Pinta un fotograma con el personaje en la pose indicada. */
@@ -157,6 +178,7 @@ export function paintHumanoid(look: HumanoidLook, pose: HumanoidPose): HumanoidF
   const p = look.proportions ?? CLASSIC_PROPORTIONS;
   const buf = new PixelBuffer(p.frameWidth, p.frameHeight);
   const lean = pose.lean ?? 0;
+  const hipX = p.hipX ?? HIP_X;
 
   // La cadera se coloca de modo que el pie más bajo toque siempre el suelo:
   // el balanceo vertical del paso sale solo de la geometría de las piernas.
@@ -169,8 +191,8 @@ export function paintHumanoid(look: HumanoidLook, pose: HumanoidPose): HumanoidF
 
   const torsoTop = hipY - p.torsoHeight;
   const shift = (row: number): number => Math.round(lean * (1 - row / (p.torsoHeight - 1)));
-  const torsoLeft = (row: number): number => HIP_X - p.torsoHalf + shift(row);
-  const shoulder: Point = { x: HIP_X + shift(0), y: torsoTop + 2 };
+  const torsoLeft = (row: number): number => hipX - p.torsoHalf + shift(row);
+  const shoulder: Point = { x: hipX + shift(0), y: torsoTop + 2 };
   const torsoBox: TorsoBox = {
     top: torsoTop,
     left: torsoLeft,
@@ -183,7 +205,7 @@ export function paintHumanoid(look: HumanoidLook, pose: HumanoidPose): HumanoidF
   if (pose.backArm) {
     drawArm(buf, { x: shoulder.x + 1, y: shoulder.y }, pose.backArm, p, look.sleeve[2], look.hand);
   }
-  drawLeg(buf, { x: HIP_X - 1, y: hipY }, pose.backLeg, p, {
+  drawLeg(buf, { x: hipX - 1, y: hipY }, pose.backLeg, p, {
     brush: [look.legs[2], look.legs[2], look.legs[2]],
     boot: look.boots[1],
     sole: look.boots[1],
@@ -219,7 +241,7 @@ export function paintHumanoid(look: HumanoidLook, pose: HumanoidPose): HumanoidF
   look.torsoDetail?.(buf, torsoBox, pose);
 
   // 4. Pierna cercana.
-  drawLeg(buf, { x: HIP_X + 1, y: hipY }, pose.frontLeg, p, {
+  drawLeg(buf, { x: hipX + 1, y: hipY }, pose.frontLeg, p, {
     brush: [look.legs[2], look.legs[1], look.legs[0]],
     boot: look.boots[0],
     sole: look.boots[1],

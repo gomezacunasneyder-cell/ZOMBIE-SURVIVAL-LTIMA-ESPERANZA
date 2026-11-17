@@ -94,7 +94,31 @@ export const CHAPTER_1: LevelDef = {
     { kind: 'brokenLamp', x: 860 },
     { kind: 'alarm', x: 2172 },
   ],
-  walkers: [540, 760, 880, 1080, 1220, 1380, 1540, 1660, 1800, 1940, 2080, 2270],
+  // La dificultad crece al avanzar: caminantes al principio, corredores en
+  // el puesto de control, Chasqueadores en la barricada a oscuras y un
+  // mutante encerrado tras la barricada del campamento.
+  enemies: [
+    { kind: 'walker', x: 540 },
+    { kind: 'walker', x: 760 },
+    { kind: 'walker', x: 880 },
+    { kind: 'runner', x: 1000 },
+    { kind: 'walker', x: 1080 },
+    { kind: 'walker', x: 1220 },
+    { kind: 'clicker', x: 1340 },
+    { kind: 'walker', x: 1540 },
+    { kind: 'clicker', x: 1640 },
+    { kind: 'runner', x: 1780 },
+    { kind: 'walker', x: 1940 },
+    { kind: 'clicker', x: 2040 },
+    { kind: 'walker', x: 2080 },
+    { kind: 'mutant', x: 2290 },
+  ],
+  reinforcements: {
+    'AVENIDA CENTRAL': { walker: 1 },
+    'PUESTO DE CONTROL': { walker: 3, runner: 1 },
+    BARRICADA: { walker: 3, runner: 1, clicker: 1 },
+    CAMPAMENTO: { walker: 2, runner: 2, clicker: 1 },
+  },
   pickups: [570, 1180, 1620, 2050],
   decals: [
     [0, 278, 228],
@@ -109,5 +133,5 @@ export const CHAPTER_1: LevelDef = {
     [0, 2010, 233],
     [1, 2290, 238],
   ],
-  helicopter: { x: 2060, y: 44 },
+  helicopter: { y: 44 },
 };

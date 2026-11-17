@@ -49,13 +49,17 @@ test.describe('arsenal', () => {
   test('mientras se desenfunda no dispara', async ({ page }) => {
     await openGame(page);
     await aimFromPlayer(page, 120, 0);
+    // Con el gatillo apretado desde antes del cambio: ninguna bala sale hasta que el arma está lista.
+    await page.mouse.down();
     await page.keyboard.press('3');
-    await until(page, (s) => s.weapon.id === 'rifle' && !s.weapon.ready);
-    await click(page);
-    await waitGame(page, 60);
-    const s = await state(page);
-    expect(s.weapon.magazine).toBe(30);
-    expect(s.weapon.fired).toBe(0);
+    const verdict = await page.waitForFunction(() => {
+      const w = window.__ZS__!.sim!.state().weapon;
+      if (w.id !== 'rifle') return false;
+      if (!w.ready && w.fired > 0) return 'disparo antes de estar lista';
+      return w.ready && w.fired > 0 ? 'ok' : false;
+    });
+    await page.mouse.up();
+    expect(await verdict.jsonValue()).toBe('ok');
   });
 
   test('la rueda del ratón pasa a la siguiente arma y a la anterior', async ({ page }) => {
@@ -180,6 +184,9 @@ test.describe('arsenal', () => {
       { id: 'shotgun', magazine: 6 },
       { id: 'rifle', magazine: 29 },
       { id: 'mg', magazine: 60 },
+      // Lanzallamas y lanzacohetes: ranuras 5 y 6, vacías hasta encontrarlos en una caja.
+      null,
+      null,
     ]);
   });
 

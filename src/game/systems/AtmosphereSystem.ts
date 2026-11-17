@@ -131,6 +131,11 @@ export class AtmosphereSystem {
 
     // Alarma: destello rojo que gira, dos vueltas por segundo.
     for (const alarm of this.alarms) {
+      if (!alarm.armed) {
+        alarm.light.power = 0;
+        alarm.glow.setAlpha(0);
+        continue;
+      }
       const sweep = Math.sin(timeMs * 0.0125);
       const on = sweep > 0.2;
       alarm.light.power = on ? 1 : 0.15;

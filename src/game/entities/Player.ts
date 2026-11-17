@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import { skinAnimation, type BodyAnimation, type PlayerSkin } from '../../art/skins';
-import type { PlayerTuning } from '../../content/player';
+import { MEDKIT, MEDKIT_WALK_FACTOR, STARTING_MEDKITS, type PlayerTuning } from '../../content/player';
 import type { WeaponDef } from '../../content/weapons';
 import { aimDegreesTowards, snapAimAngle, type AimAngle } from '../../core/combat/aim';
 import type { Resupply } from '../../core/combat/Arsenal';
 import { Health } from '../../core/combat/Health';
+import { Medkits } from '../../core/combat/Medkits';
 import type { WeaponState } from '../../core/combat/WeaponState';
 import type { EventBus, GameEvents } from '../../core/events/EventBus';
+import { movementNoise } from '../../core/ai/noise';
 import { JumpController, stepHorizontalVelocity } from '../../core/player/motion';
 import { ATLAS_KEY } from '../boot/registerArt';
 import { SFX, playSfx } from '../boot/registerAudio';
@@ -37,6 +39,7 @@ const MIN_AIR_MS = 120;
 export class Player {
   readonly sprite: Phaser.Physics.Arcade.Sprite;
   readonly health: Health;
+  readonly medkits = new Medkits(MEDKIT, STARTING_MEDKITS);
   facing: 1 | -1 = 1;
 
   private readonly rig: AimRig;
@@ -55,6 +58,10 @@ export class Player {
   private leftGroundAt = Infinity;
   /** Se pone a verdadero en el fotograma en que aterriza; la escena lo consume. */
   landed = false;
+  /** Radio del ruido que hace al moverse en este fotograma (0 = en silencio). */
+  movementNoise = 0;
+  sneaking = false;
+  private lastMedkitProgress: number | null = null;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -63,10 +70,11 @@ export class Player {
     private readonly bus: EventBus<GameEvents>,
     private readonly tuning: PlayerTuning,
     readonly skin: PlayerSkin,
+    loadout?: readonly (WeaponDef | null)[],
   ) {
     this.health = new Health(tuning.maxHealth, tuning.invulnerableMs);
     this.jump = new JumpController(tuning);
-    this.arms = new WeaponHandler(scene, bus);
+    this.arms = new WeaponHandler(scene, bus, loadout);
 
     this.shadow = scene.add.image(x, groundY + 1, ATLAS_KEY, 'fx/shadow').setAlpha(0.4).setDepth(DEPTH.player - 0.2);
     this.sprite = scene.physics.add
@@ -90,7 +98,8 @@ export class Player {
     const running = animation.key === this.anim('run');
     if (!running && animation.key !== this.anim('walk') && animation.key !== this.anim('walk-back')) return;
     this.stepCount += 1;
-    playSfx(this.scene, this.stepCount % 2 === 0 ? SFX.stepLeft : SFX.stepRight, running ? 0.3 : 0.18, 180);
+    const volume = running ? 0.3 : this.sneaking ? 0.05 : 0.18;
+    playSfx(this.scene, this.stepCount % 2 === 0 ? SFX.stepLeft : SFX.stepRight, volume, 180);
   }
 
   private anim(name: BodyAnimation): string {
@@ -153,6 +162,44 @@ export class Player {
   announce(): void {
     this.bus.emit('health', { current: this.health.current, max: this.health.max });
     this.arms.announce();
+    this.emitMedkit();
+  }
+
+  private emitMedkit(): void {
+    const progress = this.medkits.progress(this.scene.time.now);
+    this.lastMedkitProgress = progress;
+    this.bus.emit('medkit', { count: this.medkits.count, max: this.medkits.rules.max, progress });
+  }
+
+  /** Botiquín: Q empieza a usarlo; al terminar cura. Devuelve si está curándose. */
+  private updateMedkit(now: number, pressed: boolean): boolean {
+    if (pressed) {
+      const result = this.medkits.start(now, this.health.max - this.health.current);
+      if (result === 'started') {
+        this.arms.cancelReload();
+        playSfx(this.scene, SFX.medkit, 0.5, 60);
+      } else if (result === 'none') this.bus.emit('notice', { text: 'SIN BOTIQUINES' });
+      else if (result === 'full-health') this.bus.emit('notice', { text: 'VIDA AL MAXIMO' });
+    }
+    const healed = this.medkits.update(now);
+    if (healed > 0) {
+      const gained = this.health.heal(healed);
+      this.bus.emit('health', { current: this.health.current, max: this.health.max });
+      this.bus.emit('notice', { text: `VIDA +${Math.round(gained)}` });
+      playSfx(this.scene, SFX.pickup, 0.4, 0);
+    }
+    const progress = this.medkits.progress(now);
+    if (healed > 0 || (progress === null) !== (this.lastMedkitProgress === null) || (progress !== null && progress - (this.lastMedkitProgress ?? 0) >= 0.05)) {
+      this.emitMedkit();
+    }
+    return this.medkits.using;
+  }
+
+  /** Recoge botiquines de una caja. Devuelve cuántos cupieron. */
+  addMedkits(count: number): number {
+    const added = this.medkits.add(count);
+    if (added > 0) this.emitMedkit();
+    return added;
   }
 
   /** Aplica las acciones del jugador. Devuelve un disparo si se ha producido. */
@@ -180,28 +227,37 @@ export class Player {
     // Movimiento con aceleración; aturdido tras un golpe no responde.
     const stunned = now < this.hurtUntil;
     const direction = stunned ? 0 : input.direction;
+    const healing = this.updateMedkit(now, input.medkitPressed);
+    // Caminar en silencio: la misma física con la velocidad de sigilo.
+    this.sneaking = input.sneak && onGround;
+    let tuning = this.sneaking ? { ...this.tuning, walkSpeed: this.tuning.sneakSpeed } : this.tuning;
+    // Curándose, Alex solo puede caminar despacio.
+    if (healing) tuning = { ...tuning, walkSpeed: this.tuning.walkSpeed * MEDKIT_WALK_FACTOR, runSpeed: this.tuning.walkSpeed * MEDKIT_WALK_FACTOR };
     if (!stunned) {
       body.setVelocityX(
-        stepHorizontalVelocity(body.velocity.x, { direction, running: input.run, facing: this.facing, onGround }, dt, this.tuning),
+        stepHorizontalVelocity(body.velocity.x, { direction, running: input.run, facing: this.facing, onGround }, dt, tuning),
       );
     }
+    const speed = Math.abs(body.velocity.x);
+    this.movementNoise = movementNoise(speed, speed > this.tuning.walkSpeed + 12, this.sneaking, onGround);
 
     const decision = this.jump.update(now, onGround, input.jumpPressed && !stunned, input.jumpHeld, body.velocity.y);
     if (decision.jump) body.setVelocityY(-this.tuning.jumpSpeed);
     else if (decision.cut) body.setVelocityY(body.velocity.y * this.tuning.jumpCutFactor);
 
-    const shot = this.updateWeapon(now, input);
+    const shot = this.updateWeapon(now, input, healing);
     this.updateAnimation(now, direction, onGround);
     return shot;
   }
 
-  private updateWeapon(now: number, input: InputFrame): ShotRequest | null {
+  private updateWeapon(now: number, input: InputFrame, busy: boolean): ShotRequest | null {
     const shot = this.arms.update(now, input, {
       aim: this.aim,
       angle: this.aimFree,
       facing: this.facing,
       muzzle: this.muzzle(),
-    });
+      shoulder: this.rig.shoulder(this.facing),
+    }, busy);
     this.rig.setWeapon(this.weapon.def.id);
     if (!shot) return null;
     const recoil = shot.weapon.recoil;
@@ -227,6 +283,8 @@ export class Player {
       if (this.recent.length > 12) this.recent.shift();
     }
     this.sprite.anims.play(key, true);
+    // En sigilo el paso es más lento y cuidadoso.
+    this.sprite.anims.timeScale = this.sneaking && name === 'walk' ? 0.55 : 1;
     this.sprite.setFlipX(this.facing === -1);
   }
 
@@ -246,13 +304,18 @@ export class Player {
   }
 
   /** Recibe un golpe desde `fromX`. Devuelve `true` si hizo daño. */
-  takeHit(amount: number, fromX: number, now: number): boolean {
+  takeHit(amount: number, fromX: number, now: number, shove = 1): boolean {
     if (!this.health.damage(amount, now)) return false;
+    // Un golpe interrumpe la cura sin gastar el botiquín.
+    if (this.medkits.cancel()) {
+      this.emitMedkit();
+      this.bus.emit('notice', { text: 'CURA INTERRUMPIDA' });
+    }
     this.bus.emit('health', { current: this.health.current, max: this.health.max });
     playSfx(this.scene, SFX.hurt, 0.5);
 
     const away = this.sprite.x >= fromX ? 1 : -1;
-    this.body.setVelocity(away * this.tuning.knockbackSpeed, -90);
+    this.body.setVelocity(away * this.tuning.knockbackSpeed * shove, -90 * Math.min(1.8, shove));
     this.hurtUntil = now + this.tuning.hurtStunMs;
 
     if (this.health.dead) this.die();
@@ -261,6 +324,7 @@ export class Player {
 
   private die(): void {
     this.arms.cancelReload();
+    this.medkits.cancel();
     this.rig.setVisible(false);
     this.sprite.setAlpha(1);
     this.sprite.anims.play(this.anim('die'), true);

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { aimFromPlayer, click, hold, openGame, sim, state, until } from './helpers';
+import { aimFromPlayer, click, holdGame as hold, openGame, sim, state, until } from './helpers';
 
 test.describe('movimiento', () => {
   test('A/D y las flechas mueven a Alex, no a la cámara por separado', async ({ page }) => {
@@ -260,10 +260,11 @@ test.describe('zombi', () => {
     expect(wounded.zombies[0]!.health).toBe(66);
     expect(wounded.zombies[0]!.alive).toBe(true);
 
-    await page.waitForTimeout(260);
+    // Se espera la cadencia de la pistola en tiempo de juego, no en tiempo real.
+    await page.waitForFunction((t) => window.__ZS__!.sim!.state().time - t > 260, wounded.time);
     await click(page);
-    await until(page, (s) => s.zombies[0]!.health === 32, 3000);
-    await page.waitForTimeout(260);
+    const second = await until(page, (s) => s.zombies[0]!.health === 32, 3000);
+    await page.waitForFunction((t) => window.__ZS__!.sim!.state().time - t > 260, second.time);
     await click(page);
     const dead = await until(page, (s) => s.kills === 1, 3000);
     expect(dead.zombies[0]).toMatchObject({ alive: false, state: 'dead', health: 0 });

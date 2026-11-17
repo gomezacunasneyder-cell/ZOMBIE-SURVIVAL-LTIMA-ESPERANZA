@@ -6,7 +6,7 @@ import type { SynthSound } from './gunshot';
  * devuelve muestras; el adaptador las convierte en `AudioBuffer`.
  */
 
-function render(
+export function render(
   sampleRate: number,
   seconds: number,
   sample: (t: number, i: number) => number,
@@ -23,7 +23,7 @@ function render(
 }
 
 /** Golpe metálico breve en el instante `at`. */
-function click(t: number, at: number, noise: number, pitch: number): number {
+export function click(t: number, at: number, noise: number, pitch: number): number {
   const local = t - at;
   if (local < 0) return 0;
   const envelope = Math.exp(-local * 90);

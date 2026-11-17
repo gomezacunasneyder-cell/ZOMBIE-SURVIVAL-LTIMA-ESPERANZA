@@ -90,6 +90,36 @@ export const GUN_VOICES: Readonly<Record<string, GunVoice>> = {
     echoGain: 0.18,
     gain: 0.8,
   },
+  // Lanzallamas: soplido de ruido oscuro que se abre despacio, casi sin golpe.
+  flamer: {
+    seconds: 0.28,
+    cutoff: 0.32,
+    cutoffDecay: 4,
+    crackDecay: 5,
+    crackGain: 1.7,
+    thumpFrom: 70,
+    thumpTo: 40,
+    thumpDecay: 12,
+    thumpGain: 0.25,
+    echoDelay: 0,
+    echoGain: 0,
+    gain: 0.75,
+  },
+  // Lanzacohetes: estampido grave del propulsor con un siseo largo detrás.
+  rocket: {
+    seconds: 0.5,
+    cutoff: 0.6,
+    cutoffDecay: 6,
+    crackDecay: 4,
+    crackGain: 1.3,
+    thumpFrom: 95,
+    thumpTo: 28,
+    thumpDecay: 7,
+    thumpGain: 1.2,
+    echoDelay: 0.12,
+    echoGain: 0.3,
+    gain: 0.8,
+  },
 };
 
 /**

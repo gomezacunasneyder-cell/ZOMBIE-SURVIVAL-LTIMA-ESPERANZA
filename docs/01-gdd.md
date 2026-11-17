@@ -36,9 +36,9 @@ Shooter de supervivencia 2D de vista lateral en pixel art. Alex cruza de noche u
 | Apuntar | Ratón (arco limitado hacia donde mira Alex) |
 | Disparar | Clic izquierdo |
 | Recargar | R |
-| Cambiar de arma | 1–4 o rueda del ratón |
+| Cambiar de arma | 1–6 o rueda del ratón |
 | Usar botiquín | Q |
-| Interactuar | E |
+| Interactuar (abrir cajas: mantener) | E |
 | Inventario | Tab |
 | Pausa | Esc |
 
@@ -57,9 +57,11 @@ Las teclas se definen en un mapa de acciones reasignable, no directamente en el 
 |---|---|---|---|---|
 | Cuchillo | Cuerpo a cuerpo, silencioso | — | Mínimo | Inicio |
 | Pistola | Fiable, munición común | 12 | Medio | Inicio |
-| Escopeta | Siete perdigones en abanico a corta distancia, empuja | 6 | Alto | Inicio |
-| Fusil de asalto | Automático, equilibrado y de largo alcance | 30 | Alto | Inicio |
-| Ametralladora | Automática, cadencia muy alta, recarga lenta | 60 | Muy alto | Inicio |
+| Escopeta | Siete perdigones en abanico a corta distancia, empuja | 6 | Alto | Suministros (poco común) |
+| Fusil de asalto | Automático, equilibrado y de largo alcance | 30 | Alto | Suministros (poco común) |
+| Ametralladora | Automática, cadencia muy alta, recarga lenta | 60 | Muy alto | Suministros (rara) |
+| Lanzallamas | Chorro corto que atraviesa y deja ardiendo; gasta combustible muy deprisa | 80 | Medio | Suministros (rara) |
+| Lanzacohetes | Un cohete que estalla al impactar; también hiere a Alex si está cerca | 1 | Enorme | Suministros (épica, una vez por partida) |
 | Granada / cóctel molotov | Área; el fuego ilumina y hace ruido | Consumible | Muy alto | Suministros |
 
 - La munición es propia de cada arma (9 mm, cartuchos, 5.56, cinta 7.62) y se guarda en reserva. Valores exactos en `src/content/weapons.ts`.
@@ -69,24 +71,25 @@ Las teclas se definen en un mapa de acciones reasignable, no directamente en el 
 
 ## 6. Inventario y objetos
 
-- 4 ranuras de arma, reserva de munición por tipo, hasta 3 botiquines, consumibles arrojadizos y objetos de misión.
-- **Botiquín:** cura 50 puntos tras un uso de 1,5 s que se interrumpe al recibir daño.
+- 6 ranuras de arma (una por arma), reserva de munición por tipo, hasta 3 botiquines, consumibles arrojadizos y objetos de misión.
+- **Botiquín (Q):** cura 50 puntos tras un uso de 1,5 s, caminando despacio y sin disparar; recibir daño lo interrumpe sin gastarlo. Se empieza con uno.
 - **Piezas:** moneda para mejoras; la sueltan enemigos y contenedores.
-- **Cajas de suministro:** las lanza Cóndor 7 en paracaídas en puntos señalados con bengala. Contienen munición, botiquines y, a veces, un arma. Su caída hace ruido y atrae zombis: recogerla es un riesgo calculado.
+- **Cajas de suministro:** las lanza Cóndor 7 en paracaídas por delante de Alex. Alarma de radio y aviso «¡SUMINISTROS DETECTADOS!», helicóptero que entra por un extremo con el foco encendido, suelta en estacionario y sale por el otro. Llega al azar en el 70 % de las partidas y siempre al alcanzar el campamento (tres como máximo). Cada caja trae munición, botiquines o, a veces, un arma, según una tabla de rarezas (común, poco común, rara, épica) cuyo color luce en su baliza. Como mucho un arma por lanzamiento; la munición tiene tope y lo que no cabe se queda en la caja. Se abre manteniendo E. Su caída y su bengala hacen ruido y los zombis acuden a rodearla: recogerla es un riesgo calculado. Detalle en [decisiones/0006](decisiones/0006-fase-3-suministros.md).
 
 ## 7. Enemigos
 
 | Enemigo | Percepción | Comportamiento | Aparece |
 |---|---|---|---|
-| **Caminante** | Vista corta, oído normal | Lento, numeroso, ataca al contacto | Capítulo 1 |
-| **Corredor** | Vista larga | Rápido, frágil, salta obstáculos bajos | Capítulo 2 |
-| **Eco** | **Ciego.** Oído muy agudo | Patrulla emitiendo chasquidos; va hacia el último ruido; golpe muy dañino. Diseño visual propio | Capítulo 3 |
-| **Blindado** | Vista corta | Exmilitar con casco y chaleco; resiste disparos frontales | Capítulo 4 |
+| **Caminante** | Vista media, oído normal | Lento, numeroso, acude a los disparos, trepa obstáculos bajos | Capítulo 1 |
+| **Corredor** | Vista larga | Rápido y frágil; encadena dos zarpazos; salta por encima de Alex para atacarle por la espalda | Capítulo 1 (puesto de control) |
+| **Chasqueador** | **Ciego.** Oído muy agudo, oye también a otras criaturas | Va a donde oye un ruido, chasquea para escuchar y, si Alex hace ruido cerca, carga hacia ese punto. Se le esquiva en sigilo. Agarre casi letal. Cabeza reventada por un hongo | Capítulo 1 (barricada) |
+| **Mutante** | Vista media, oído débil | Gigante lento con 1100 de vida; mazazo devastador; no se aturde con balas; derriba barricadas | Capítulo 1 (campamento) |
+| **Blindado** | Vista corta | Exmilitar con casco y chaleco; resiste disparos frontales | Pendiente |
 | **EL DEVORADOR** | — | Jefe final con tres fases | Capítulo 5 |
 
 **Inteligencia artificial.** Cada enemigo usa una máquina de estados: reposo o patrulla → investigar (ha oído algo) → perseguir → atacar → aturdido → muerto. Los tipos se diferencian por datos y por sus sensores, no por código duplicado.
 
-**Sistema de ruido.** Toda acción ruidosa emite un evento con posición y radio (pasos al correr, disparos, explosiones, cajas al caer). Cada enemigo dentro del radio, según su oído, pasa a investigar ese punto. El HUD muestra el ruido que genera el jugador.
+**Sistema de ruido.** Toda acción ruidosa emite un evento con posición y radio (pasos, carrera, disparos, impactos de bala, explosiones, gruñidos de otras criaturas). Caminar en silencio (S o Ctrl) y estar quieto no hacen ruido. Cada enemigo dentro del radio, según su oído, pasa a investigar ese punto. El HUD muestra el ruido que genera el jugador.
 
 **EL DEVORADOR (propuesta de fases)**
 
@@ -98,7 +101,7 @@ Las teclas se definen en un mapa de acciones reasignable, no directamente en el 
 
 - Un **director de oleadas** lee definiciones en datos (qué enemigos, cuántos, por dónde, con qué ritmo) y controla el presupuesto de enemigos vivos.
 - En campaña las oleadas son eventos puntuales (defender una posición, esperar a Cóndor 7).
-- El **modo Oleadas**, desbloqueado al terminar el capítulo 2, reutiliza el mismo director con dificultad creciente.
+- El **modo Oleadas** (supervivencia), desbloqueado al terminar el capítulo 2, reutiliza el mismo director con dificultad creciente: cinco oleadas en «Último refugio» (caminantes; corredores; Chasqueadores; mutantes y grandes grupos; horda final de 154 por los dos lados), con aviso, contador, barra de progreso, recompensa y descanso. La horda la despierta una alarma y hay que defender las barricadas del refugio; al caer, aparece EL DEVORADOR. Detalle en [decisiones/0007](decisiones/0007-fase-4-oleadas.md).
 - Objetivo técnico para las grandes hordas: 150 zombis activos a 60 fps (ver arquitectura, rendimiento).
 
 ## 9. Historia y capítulos

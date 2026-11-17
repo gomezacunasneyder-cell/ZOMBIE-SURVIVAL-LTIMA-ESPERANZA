@@ -4,21 +4,36 @@
  * decorado, luces, enemigos y suministros.
  */
 
+import type { EnemyKind } from './enemies';
+
 /** Obstáculos sólidos sobre la línea de juego. La caja de colisión es algo menor que el dibujo. */
 export const SOLIDS = {
-  crate: { frame: 'prop/crate', width: 14, height: 12 },
-  barrier: { frame: 'prop/barrier', width: 24, height: 10 },
-  sandbags: { frame: 'prop/sandbags', width: 28, height: 9 },
-  car: { frame: 'vehicle/car', width: 54, height: 16 },
-  barrel: { frame: 'prop/barrel', width: 10, height: 14 },
+  crate: { frame: 'prop/crate', width: 14, height: 12, breakable: true },
+  barrier: { frame: 'prop/barrier', width: 24, height: 10, breakable: true },
+  sandbags: { frame: 'prop/sandbags', width: 28, height: 9, breakable: true },
+  car: { frame: 'vehicle/car', width: 54, height: 16, breakable: false },
+  barrel: { frame: 'prop/barrel', width: 10, height: 14, breakable: false },
   /** Bidón de combustible: estalla al recibir disparos. */
-  fuelBarrel: { frame: 'prop/fuel-barrel', width: 10, height: 21 },
+  fuelBarrel: { frame: 'prop/fuel-barrel', width: 10, height: 21, breakable: false },
+  /** Barricada reforzada del modo supervivencia: sacos, chapa y alambre. Aguanta mucho más. */
+  fortification: { frame: 'prop/fortification', width: 26, height: 20, breakable: true, hits: 60 },
 } as const;
+
+/** Barricadas: el mutante las derriba a golpes; los demás las saltan. */
+export function isBreakable(kind: SolidKind): boolean {
+  return SOLIDS[kind].breakable;
+}
 
 /** Obstáculos que explotan al dispararles. */
 export const EXPLOSIVE_SOLIDS: readonly SolidKind[] = ['fuelBarrel'];
 
 export type SolidKind = keyof typeof SOLIDS;
+
+/** Golpes que aguanta una barricada antes de romperse. */
+export function hitsToBreak(kind: SolidKind, fallback: number): number {
+  const def = SOLIDS[kind];
+  return 'hits' in def ? def.hits : fallback;
+}
 
 export interface SolidPlacement {
   kind: SolidKind;
@@ -56,6 +71,11 @@ export interface FixturePlacement {
   flipX?: boolean;
 }
 
+export interface EnemyPlacement {
+  kind: EnemyKind;
+  x: number;
+}
+
 export interface ZoneDef {
   name: string;
   /** La zona empieza en esta coordenada X. */
@@ -72,13 +92,16 @@ export interface LevelDef {
   solids: SolidPlacement[];
   decor: DecorPlacement[];
   fixtures: FixturePlacement[];
-  /** Posiciones iniciales de caminantes. */
-  walkers: number[];
+  /** Enemigos al empezar el nivel. */
+  enemies: EnemyPlacement[];
+  /** Tipos que van llegando por los bordes, con su peso relativo, según la zona. */
+  reinforcements: Record<string, Partial<Record<EnemyKind, number>>>;
   /** Cajas de suministros con munición. */
   pickups: number[];
   /** Manchas de sangre en el asfalto: [variante, x, y]. */
   decals: [variant: number, x: number, y: number][];
-  helicopter: { x: number; y: number };
+  /** Altura a la que vuela Cóndor 7 cuando trae suministros. */
+  helicopter: { y: number };
 }
 
 /** Zona a la que pertenece una coordenada X. */

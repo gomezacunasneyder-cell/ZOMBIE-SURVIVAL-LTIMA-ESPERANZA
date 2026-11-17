@@ -1,13 +1,15 @@
 import type Phaser from 'phaser';
 import type { ImportReport } from '../../art/import/spritePack';
 import { parseSkinId, type SkinId } from '../../art/skins';
+import type { LoadoutId } from '../../content/weapons';
 import type { SpriteExport } from './exportSprites';
 import type { SimState } from './simState';
 
 /** Órdenes y lecturas que la escena de juego ofrece a las pruebas. */
 export interface SimHook {
   state(): SimState;
-  spawnZombie(x: number): void;
+  /** Hace aparecer un enemigo (walker, runner, clicker o mutant). */
+  spawnZombie(x: number, kind?: string): void;
   clearZombies(): void;
   teleport(x: number): void;
   /** Fija el momento del día (0 atardecer, 1 noche) o lo libera con `null`. */
@@ -16,6 +18,18 @@ export interface SimHook {
   detonate(x: number): boolean;
   /** Fija cargador y reserva de una ranura (para probar casos límite sin gastar cientos de balas). */
   setAmmo(slot: number, magazine: number, reserve: number): void;
+  /** Pide a Cóndor 7 un lanzamiento de suministros ya. */
+  airdrop(): boolean;
+  /** Hace daño a Alex (para probar los botiquines). */
+  hurtPlayer(amount: number): void;
+  /** Da un arma a Alex como si saliera de una caja. */
+  giveWeapon(id: string): void;
+  /** Modo supervivencia: salta a la oleada `wave` (1…5). */
+  skipToWave(wave: number): void;
+  /** Mata a todos los enemigos en pie (cuentan como bajas). */
+  killAll(): void;
+  /** Prueba de rendimiento: hace aparecer `count` enemigos alrededor de Alex. */
+  stress(count: number): void;
 }
 
 export interface TextBounds {
@@ -53,7 +67,7 @@ declare global {
 
 /** Opciones de arranque leídas de la URL (`?scene=gallery&freeze=1&test=1`). */
 export interface LaunchOptions {
-  scene: 'game' | 'gallery' | 'compare' | 'arsenal';
+  scene: 'game' | 'gallery' | 'compare' | 'arsenal' | 'bestiary';
   /** Detiene las animaciones de la galería para capturas reproducibles. */
   freeze: boolean;
   /** Arranca el nivel sin enemigos, para pruebas deterministas. */
@@ -62,6 +76,16 @@ export interface LaunchOptions {
   skin: SkinId;
   /** Momento del día fijo (`?hora=noche`); `null` = ciclo normal. */
   night: number | null;
+  /** Armas al empezar (`?arsenal=basico|completo`); por defecto solo la pistola. */
+  loadout: LoadoutId;
+  /** Semilla de la partida (`?semilla=123`); sin ella, cada partida es distinta. */
+  seed: number | null;
+  /** `?suministros=ya`: Cóndor 7 llega nada más empezar. */
+  airdropNow: boolean;
+  /** `?modo=oleadas`: modo supervivencia; si no, la campaña. */
+  mode: 'campaign' | 'survival';
+  /** `&oleada=N`: oleada con la que empieza el modo supervivencia (0 = la primera). */
+  startWave: number;
 }
 
 /** `atardecer`, `noche` o un número de 0 a 1. */
@@ -77,11 +101,21 @@ export function readLaunchOptions(search: string): LaunchOptions {
   const params = new URLSearchParams(search);
   const scene = params.get('scene');
   return {
-    scene: scene === 'gallery' || scene === 'compare' || scene === 'arsenal' ? scene : 'game',
+    scene:
+      scene === 'gallery' || scene === 'compare' || scene === 'arsenal'
+        ? scene
+        : scene === 'bestiario' || scene === 'bestiary'
+          ? 'bestiary'
+          : 'game',
     freeze: params.get('freeze') === '1',
     test: params.get('test') === '1',
     skin: parseSkinId(params.get('skin')),
     night: parseHour(params.get('hora')),
+    loadout: params.get('arsenal') === 'completo' ? 'completo' : params.get('arsenal') === 'basico' ? 'basico' : 'inicial',
+    seed: Number.isFinite(Number(params.get('semilla'))) && params.get('semilla') !== null ? Number(params.get('semilla')) : null,
+    airdropNow: params.get('suministros') === 'ya',
+    mode: params.get('modo') === 'oleadas' ? 'survival' : 'campaign',
+    startWave: Math.max(0, Math.floor(Number(params.get('oleada') ?? 1) || 1) - 1),
   };
 }
 

@@ -2,6 +2,8 @@
 export interface PlayerTuning {
   walkSpeed: number;
   runSpeed: number;
+  /** Caminar en silencio. */
+  sneakSpeed: number;
   /** Factor de velocidad al caminar de espaldas a donde apunta. */
   backwardFactor: number;
   groundAccel: number;
@@ -24,6 +26,7 @@ export interface PlayerTuning {
 export const PLAYER_TUNING: PlayerTuning = {
   walkSpeed: 54,
   runSpeed: 104,
+  sneakSpeed: 26,
   backwardFactor: 0.75,
   groundAccel: 560,
   groundDecel: 700,
@@ -38,6 +41,13 @@ export const PLAYER_TUNING: PlayerTuning = {
   hurtStunMs: 200,
   knockbackSpeed: 110,
 };
+
+/** Botiquines (GDD §6): hasta 3, curan 50 y tardan 1,5 s. */
+export const MEDKIT = { max: 3, heal: 50, useMs: 1500 } as const;
+/** Botiquines con los que empieza Alex. */
+export const STARTING_MEDKITS = 1;
+/** Mientras se cura, Alex camina despacio. */
+export const MEDKIT_WALK_FACTOR = 0.45;
 
 /** Gravedad del mundo en px/s². */
 export const GRAVITY = 900;

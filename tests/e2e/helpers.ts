@@ -1,9 +1,14 @@
 import type { Page } from '@playwright/test';
 import type { SimState } from '../../src/game/debug/simState';
 
-/** Abre el nivel sin enemigos y espera a que esté listo. */
+/**
+ * Abre el nivel sin enemigos y espera a que esté listo. Salvo que se
+ * indique otro, empieza con las cuatro armas de la Fase 3 (`arsenal=basico`):
+ * en una partida normal Alex solo lleva la pistola.
+ */
 export async function openGame(page: Page, query = '?test=1'): Promise<void> {
-  await page.goto(`/${query}`);
+  const withArsenal = query.includes('arsenal=') ? query : `${query}${query.includes('?') ? '&' : '?'}arsenal=basico`;
+  await page.goto(`/${withArsenal}`);
   await page.waitForFunction(() => window.__ZS__?.readyScene === 'Game' && !!window.__ZS__.sim);
   // Un clic fuera de la acción da el foco de teclado al juego.
   await page.locator('canvas').hover();
@@ -43,9 +48,18 @@ export async function aimFromPlayer(page: Page, dx: number, dy: number): Promise
   await page.waitForTimeout(60);
 }
 
+/** Mantiene teclas pulsadas un tiempo real. Para menús y pausa, donde el tiempo de juego no corre. */
 export async function hold(page: Page, keys: string[], ms: number): Promise<void> {
   for (const key of keys) await page.keyboard.down(key);
   await page.waitForTimeout(ms);
+  for (const key of keys) await page.keyboard.up(key);
+}
+
+/** Mantiene teclas pulsadas `ms` de tiempo de juego: no depende de lo cargado que esté el equipo. */
+export async function holdGame(page: Page, keys: string[], ms: number): Promise<void> {
+  for (const key of keys) await page.keyboard.down(key);
+  const start = (await state(page)).time;
+  await page.waitForFunction(([t, d]) => window.__ZS__!.sim!.state().time - t! >= d!, [start, ms]);
   for (const key of keys) await page.keyboard.up(key);
 }
 

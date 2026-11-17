@@ -101,6 +101,9 @@ import {
   paintWalkerHurt,
   paintWalkerWalk,
 } from './painters/zombies';
+import { addEnemyAnimations } from './enemyArt';
+import { addSupplyArt } from './supplyArt';
+import { addSurvivalArt } from './survivalArt';
 import { P } from './palette';
 import { PixelBuffer } from './PixelBuffer';
 import type { HumanoidFrame } from './rig/humanoid';
@@ -237,6 +240,9 @@ export function buildArtCatalog(): ArtCatalog {
     addAnimation(`walker/${variant}/die`, paintWalkerDie(variant), 8, 0);
   }
 
+  // Corredores, Chasqueadores y mutantes (Fase 4).
+  addEnemyAnimations((key, frames, rate, repeat) => addAnimation(key, frames, rate, repeat));
+
   // Vehículos.
   sprites.set('vehicle/car', paintWreckedCar());
   sprites.set('vehicle/truck', paintMilitaryTruck());
@@ -247,6 +253,10 @@ export function buildArtCatalog(): ArtCatalog {
     24,
   );
   addAnimation('heli/tail', [paintTailRotor(0), paintTailRotor(1)], 24);
+  // Fase 3: Cóndor 7, cajas de suministros y armas pesadas.
+  addSupplyArt(sprites, (key, frames, rate, repeat) => addAnimation(key, frames, rate, repeat));
+  // Fase 4: modo supervivencia.
+  addSurvivalArt(sprites);
 
   // Objetos.
   sprites.set('prop/barrel', paintBarrel());

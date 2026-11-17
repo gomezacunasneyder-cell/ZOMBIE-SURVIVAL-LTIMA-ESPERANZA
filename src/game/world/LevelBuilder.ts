@@ -2,7 +2,9 @@ import type Phaser from 'phaser';
 import { APARTMENT_OPENINGS, SHOP_OPENINGS, type FacadeOpening } from '../../art/painters/facades';
 import { shadowFrameFor } from '../../art/painters/hazards';
 import { colorNumber } from '../../art/palette';
-import { EXPLOSIVE_SOLIDS, SOLIDS, type FixturePlacement, type LevelDef } from '../../content/level';
+import { FORTIFICATION_FRAMES } from '../../art/survivalArt';
+import { BARRICADE_HITS } from '../../content/enemies';
+import { EXPLOSIVE_SOLIDS, SOLIDS, hitsToBreak, isBreakable, type FixturePlacement, type LevelDef } from '../../content/level';
 import { ATLAS_KEY, MASK } from '../boot/registerArt';
 import { GAME_HEIGHT } from '../config';
 import type { Light, LightingSystem } from '../systems/LightingSystem';
@@ -26,6 +28,8 @@ export interface WorldPoint {
 export interface AlarmHandle extends WorldPoint {
   light: Light;
   glow: Phaser.GameObjects.Image;
+  /** Encendida (destella y suena). El modo supervivencia las enciende al llegar la horda. */
+  armed: boolean;
 }
 
 /** Bidón de combustible que puede estallar. */
@@ -35,6 +39,22 @@ export interface ExplosiveHandle extends WorldPoint {
   shadow: Phaser.GameObjects.Image;
   hits: number;
   exploded: boolean;
+}
+
+/** Barricada que el mutante puede derribar. */
+export interface BarricadeHandle extends WorldPoint {
+  zone: Phaser.GameObjects.Zone;
+  sprite: Phaser.GameObjects.Image;
+  shadow: Phaser.GameObjects.Image;
+  width: number;
+  hits: number;
+  /** Golpes que aguanta. */
+  maxHits: number;
+  /** Fotogramas de deterioro (de entera a casi rota), si los tiene. */
+  stages: string[];
+  broken: boolean;
+  /** Último golpe que encajó. */
+  lastHitAt: number;
 }
 
 export interface BuiltLevel {
@@ -47,6 +67,7 @@ export interface BuiltLevel {
   sparkers: WorldPoint[];
   alarms: AlarmHandle[];
   explosives: ExplosiveHandle[];
+  barricades: BarricadeHandle[];
 }
 
 /**
@@ -55,7 +76,7 @@ export interface BuiltLevel {
  * los obstáculos. No hay ninguna imagen de fondo que simule el escenario.
  */
 export function buildLevel(scene: Phaser.Scene, level: LevelDef, lighting: LightingSystem): BuiltLevel {
-  const built: BuiltLevel = { solids: [], lamps: [], fires: [], sparkers: [], alarms: [], explosives: [] };
+  const built: BuiltLevel = { solids: [], lamps: [], fires: [], sparkers: [], alarms: [], explosives: [], barricades: [] };
 
   const solidZone = (x: number, y: number, width: number, height: number): Phaser.GameObjects.Zone => {
     const zone = scene.add.zone(x, y, width, height);
@@ -97,6 +118,23 @@ export function buildLevel(scene: Phaser.Scene, level: LevelDef, lighting: Light
       };
       zone.setData('explosive', handle);
       built.explosives.push(handle);
+    }
+    if (isBreakable(solid.kind)) {
+      const handle: BarricadeHandle = {
+        zone,
+        sprite,
+        shadow,
+        x: solid.x,
+        y: level.playLine - def.height / 2,
+        width: def.width,
+        hits: 0,
+        maxHits: hitsToBreak(solid.kind, BARRICADE_HITS),
+        stages: solid.kind === 'fortification' ? FORTIFICATION_FRAMES : [],
+        broken: false,
+        lastHitAt: -Infinity,
+      };
+      zone.setData('barricade', handle);
+      built.barricades.push(handle);
     }
   }
 
@@ -219,6 +257,7 @@ function buildFixture(
         y: lampY,
         light: lighting.addLight(MASK.radialMedium, lampX, lampY, { intensity: 0.5 }),
         glow: lighting.addGlow(MASK.radialMedium, lampX, lampY, colorNumber('blood1'), 0.5),
+        armed: true,
       });
       break;
     }

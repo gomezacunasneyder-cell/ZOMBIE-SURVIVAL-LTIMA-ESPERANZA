@@ -5,6 +5,9 @@ import { ATLAS_KEY, FONT_KEY } from '../boot/registerArt';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { updateTestHook, type TextBounds } from '../debug/testHook';
 import { BUS_KEY, SCENE } from '../scenes/keys';
+import { AirdropHud } from './AirdropHud';
+import { NoiseMeter } from './NoiseMeter';
+import { WaveHud } from './WaveHud';
 import { PANEL, WeaponPanel } from './WeaponPanel';
 
 /** Margen mínimo entre cualquier elemento del HUD y el borde de la pantalla. */
@@ -27,13 +30,20 @@ export class HudScene extends Phaser.Scene {
   private healthFill!: Phaser.GameObjects.Graphics;
   private healthText!: Phaser.GameObjects.BitmapText;
   private phaseText!: Phaser.GameObjects.BitmapText;
+  private noiseMeter!: NoiseMeter;
   private barTop!: Phaser.GameObjects.Rectangle;
   private barBottom!: Phaser.GameObjects.Rectangle;
   private panel!: WeaponPanel;
   private crosshair!: Phaser.GameObjects.Image;
   private cursorBar!: Phaser.GameObjects.Graphics;
   private reloadProgress: number | null = null;
+  private healProgress: number | null = null;
+  private medkitText!: Phaser.GameObjects.BitmapText;
+  private medkitIcon!: Phaser.GameObjects.Image;
+  private airdropHud!: AirdropHud;
+  private waveHud!: WaveHud;
   private killsText!: Phaser.GameObjects.BitmapText;
+  private skull!: Phaser.GameObjects.Image;
   private notice!: Phaser.GameObjects.BitmapText;
   private zoneTitle!: Phaser.GameObjects.BitmapText;
   private noticeUntil = 0;
@@ -51,13 +61,17 @@ export class HudScene extends Phaser.Scene {
     this.zoneUntil = 0;
     this.magazineEmpty = false;
     this.reloadProgress = null;
+    this.healProgress = null;
     this.dead = false;
 
     this.buildLetterbox();
     this.buildHealth();
+    this.noiseMeter = new NoiseMeter(this, MARGIN, MARGIN + 22, (x, y, content) => this.text(x, y, content));
     this.buildKills();
     this.panel = new WeaponPanel(this, PANEL_X, PANEL_Y, (x, y, content, scale) => this.text(x, y, content, scale));
     this.buildMessages();
+    this.airdropHud = new AirdropHud(this, (x, y, content, scale) => this.text(x, y, content, scale));
+    this.waveHud = new WaveHud(this, (x, y, content, scale) => this.text(x, y, content, scale));
     this.buildCrosshair();
 
     const bus = this.registry.get(BUS_KEY) as EventBus<GameEvents>;
@@ -73,11 +87,22 @@ export class HudScene extends Phaser.Scene {
       }),
       bus.on('weapon', (e) => this.panel.showWeapon(e.icon, e.name)),
       bus.on('arsenal', (e) => this.panel.showSlots(e)),
-      bus.on('kills', (e) => this.killsText.setText(`x${e.total}`)),
+      bus.on('kills', (e) => this.showKills(e.total)),
+      bus.on('noise', (e) => this.noiseMeter.show(e.level, e.sneaking)),
       bus.on('notice', (e) => this.showNotice(e.text)),
       bus.on('zone', (e) => this.showZone(e.name)),
       bus.on('daytime', (e) => this.phaseText.setText(e.phase)),
       bus.on('playerDied', (e) => this.showGameOver(e.kills)),
+      bus.on('medkit', (e) => this.showMedkits(e.count, e.max, e.progress)),
+      bus.on('airdrop', (e) => this.airdropHud.onAirdrop(e)),
+      bus.on('wave', (e) => this.waveHud.onWave(e)),
+      bus.on('announce', (e) => this.waveHud.onAnnounce(e)),
+      bus.on('danger', (e) => this.waveHud.onDanger(e.level)),
+      bus.on('survivalEnd', (e) => {
+        this.dead = true;
+        this.input.setDefaultCursor('default');
+        this.waveHud.showEnd(e);
+      }),
     ];
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => off.forEach((unsubscribe) => unsubscribe()));
 
@@ -88,6 +113,8 @@ export class HudScene extends Phaser.Scene {
     if (this.notice.visible && time >= this.noticeUntil) this.notice.setVisible(false);
     if (this.zoneTitle.visible && time >= this.zoneUntil) this.zoneTitle.setVisible(false);
     this.panel.update(time);
+    this.airdropHud.update(time);
+    this.waveHud.update(time);
     this.updateCrosshair();
   }
 
@@ -115,11 +142,14 @@ export class HudScene extends Phaser.Scene {
     this.healthFill = this.add.graphics();
     this.healthText = this.text(BAR.x + BAR.width + 6, BAR.y + 1, '100');
     this.phaseText = this.text(MARGIN, MARGIN + 13, 'ATARDECER').setTint(colorNumber('grey1'));
+    // Botiquines, a la derecha de la vida.
+    this.medkitIcon = this.add.image(BAR.x + BAR.width + 24, MARGIN, ATLAS_KEY, 'ui/medkit').setOrigin(0, 0);
+    this.medkitText = this.text(BAR.x + BAR.width + 38, BAR.y + 1, 'x0');
   }
 
   private buildKills(): void {
     this.killsText = this.text(GAME_WIDTH - MARGIN, MARGIN + 2, 'x0', 2).setOrigin(1, 0);
-    this.add.image(GAME_WIDTH - MARGIN - 40, MARGIN, ATLAS_KEY, 'ui/skull').setOrigin(0, 0);
+    this.skull = this.add.image(GAME_WIDTH - MARGIN - 40, MARGIN, ATLAS_KEY, 'ui/skull').setOrigin(0, 0);
   }
 
   /**
@@ -140,13 +170,17 @@ export class HudScene extends Phaser.Scene {
     const y = Math.round(pointer.y);
     this.crosshair.setPosition(x, y).setVisible(!this.dead);
     const reloading = this.reloadProgress !== null;
-    this.crosshair.setTint(reloading ? colorNumber('light2') : this.magazineEmpty ? colorNumber('blood1') : 0xffffff);
+    const healing = this.healProgress !== null;
+    this.crosshair.setTint(
+      healing ? colorNumber('ui1') : reloading ? colorNumber('light2') : this.magazineEmpty ? colorNumber('blood1') : 0xffffff,
+    );
     const g = this.cursorBar.clear();
-    if (!reloading || this.dead) return;
+    if ((!reloading && !healing) || this.dead) return;
+    const progress = healing ? (this.healProgress ?? 0) : (this.reloadProgress ?? 0);
     const left = x - Math.floor(CURSOR_BAR.width / 2);
     const top = y + CURSOR_BAR.dy;
     g.fillStyle(colorNumber('outline'), 1).fillRect(left - 1, top - 1, CURSOR_BAR.width + 2, 4);
-    g.fillStyle(colorNumber('light2'), 1).fillRect(left, top, Math.round(CURSOR_BAR.width * (this.reloadProgress ?? 0)), 2);
+    g.fillStyle(colorNumber(healing ? 'ui1' : 'light2'), 1).fillRect(left, top, Math.round(CURSOR_BAR.width * progress), 2);
   }
 
   private buildMessages(): void {
@@ -157,8 +191,8 @@ export class HudScene extends Phaser.Scene {
       .setVisible(false);
     // Dos líneas para no invadir el panel de armas.
     const hints = [
-      this.text(MARGIN, GAME_HEIGHT - MARGIN - 12, 'A/D MOVER  SHIFT CORRER  ESPACIO SALTAR  ESC PAUSA'),
-      this.text(MARGIN, GAME_HEIGHT - MARGIN - 5, 'CLIC DISPARAR  R RECARGAR  1-4 O RUEDA: ARMA'),
+      this.text(MARGIN, GAME_HEIGHT - MARGIN - 12, 'A/D MOVER  SHIFT CORRER  S/CTRL SIGILO  ESPACIO SALTAR  ESC PAUSA'),
+      this.text(MARGIN, GAME_HEIGHT - MARGIN - 5, 'CLIC DISPARAR  R RECARGAR  1-6/RUEDA ARMA  Q BOTIQUIN  E ABRIR'),
     ];
     this.time.delayedCall(14000, () => hints.forEach((hint) => hint.setVisible(false)));
   }
@@ -179,6 +213,18 @@ export class HudScene extends Phaser.Scene {
     g.fillStyle(colorNumber('outline'), 1);
     for (let i = 1; i < 4; i++) g.fillRect(BAR.x + (BAR.width / 4) * i, BAR.y, 1, BAR.height);
     this.healthText.setText(String(Math.ceil(current)));
+  }
+
+  private showMedkits(count: number, max: number, progress: number | null): void {
+    this.healProgress = progress;
+    this.medkitText.setText(`x${count}`).setTint(colorNumber(count === 0 ? 'blood1' : count === max ? 'ui1' : 'white'));
+    this.medkitIcon.setAlpha(count === 0 ? 0.45 : 1);
+  }
+
+  /** La calavera se aparta a medida que el contador gana cifras (en las hordas pasa de 100). */
+  private showKills(total: number): void {
+    this.killsText.setText(`x${total}`);
+    this.skull.setX(Math.min(GAME_WIDTH - MARGIN - 40, GAME_WIDTH - MARGIN - this.killsText.width - 16));
   }
 
   private showNotice(content: string): void {

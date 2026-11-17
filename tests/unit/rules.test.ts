@@ -5,7 +5,7 @@ import { SOLIDS, zoneAt } from '../../src/content/level';
 import { PLAYER_TUNING, GRAVITY } from '../../src/content/player';
 import { PISTOL, STARTING_LOADOUT, WEAPON_SLOTS } from '../../src/content/weapons';
 import { buildArtCatalog } from '../../src/art/catalog';
-import { WalkerBrain, type WalkerPerception } from '../../src/core/ai/WalkerBrain';
+import { EnemyBrain, type EnemyPerception } from '../../src/core/ai/EnemyBrain';
 import { shotDirection, spreadFrom } from '../../src/core/combat/ballistics';
 import { Health } from '../../src/core/combat/Health';
 import { WeaponState } from '../../src/core/combat/WeaponState';
@@ -217,8 +217,8 @@ describe('salto', () => {
 });
 
 describe('cerebro del caminante', () => {
-  const brain = (): WalkerBrain => new WalkerBrain(WALKER, 500, () => 0.5);
-  const see = (over: Partial<WalkerPerception>): WalkerPerception => ({
+  const brain = (): EnemyBrain => new EnemyBrain(WALKER, 500, () => 0.5);
+  const see = (over: Partial<EnemyPerception>): EnemyPerception => ({
     now: 0,
     selfX: 500,
     dx: 1000,
@@ -228,7 +228,7 @@ describe('cerebro del caminante', () => {
   });
 
   it('deambula despacio cerca de su sitio si no ve a Alex', () => {
-    const b = new WalkerBrain(WALKER, 500, () => 1);
+    const b = new EnemyBrain(WALKER, 500, () => 1);
     const intent = b.update(see({}));
     expect(b.state).toBe('wander');
     expect(intent.speed).toBe(WALKER.wanderSpeed);
@@ -238,31 +238,31 @@ describe('cerebro del caminante', () => {
 
   it('detecta a Alex dentro de su alcance de visión y lo persigue', () => {
     const b = brain();
-    b.update(see({ dx: WALKER.sightRange + 10 }));
+    b.update(see({ dx: WALKER.sight!.range + 10 }));
     expect(b.state).toBe('wander');
-    const intent = b.update(see({ dx: -(WALKER.sightRange - 10) }));
+    const intent = b.update(see({ dx: -(WALKER.sight!.range - 10) }));
     expect(b.state).toBe('chase');
     expect(intent).toMatchObject({ move: -1, speed: WALKER.chaseSpeed, facing: -1 });
   });
 
   it('no lo ve si está muy por encima', () => {
     const b = brain();
-    b.update(see({ dx: 40, dy: -(WALKER.sightHeight + 20) }));
+    b.update(see({ dx: 40, dy: -(WALKER.sight!.height + 20) }));
     expect(b.state).toBe('wander');
   });
 
   it('prepara el golpe, lo descarga una vez y se recupera', () => {
     const b = brain();
     b.update(see({ dx: 100 }));
-    const stop = b.update(see({ now: 100, dx: WALKER.attackRange - 1 }));
+    const stop = b.update(see({ now: 100, dx: WALKER.attack.range - 1 }));
     expect(b.state).toBe('windup');
     expect(stop.move).toBe(0);
-    expect(b.update(see({ now: 100 + WALKER.windupMs - 1, dx: 10 })).strike).toBe(false);
-    expect(b.update(see({ now: 100 + WALKER.windupMs, dx: 10 })).strike).toBe(true);
+    expect(b.update(see({ now: 100 + WALKER.attack.windupMs - 1, dx: 10 })).strike).toBe(false);
+    expect(b.update(see({ now: 100 + WALKER.attack.windupMs, dx: 10 })).strike).toBe(true);
     expect(b.state).toBe('recover');
-    const after = 100 + WALKER.windupMs;
+    const after = 100 + WALKER.attack.windupMs;
     expect(b.update(see({ now: after + 10, dx: 10 })).strike).toBe(false);
-    b.update(see({ now: after + WALKER.recoverMs, dx: 60 }));
+    b.update(see({ now: after + WALKER.attack.recoverMs, dx: 60 }));
     expect(b.state).toBe('chase');
   });
 
@@ -314,7 +314,7 @@ describe('datos del capítulo 1', () => {
       ...level.solids.map((s) => s.x),
       ...level.decor.map((d) => d.x),
       ...level.fixtures.map((f) => f.x),
-      ...level.walkers,
+      ...level.enemies.map((e) => e.x),
       ...level.pickups,
     ];
     for (const x of xs) {
@@ -330,7 +330,7 @@ describe('datos del capítulo 1', () => {
   });
 
   it('no hay enemigos ni obstáculos encima del punto de partida', () => {
-    for (const x of level.walkers) expect(Math.abs(x - level.spawnX)).toBeGreaterThan(WALKER.sightRange);
+    for (const { x } of level.enemies) expect(Math.abs(x - level.spawnX)).toBeGreaterThan(WALKER.sight!.range);
     for (const solid of level.solids) expect(Math.abs(solid.x - level.spawnX)).toBeGreaterThan(60);
   });
 

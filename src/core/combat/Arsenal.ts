@@ -10,6 +10,13 @@ export interface ArsenalWeapon extends WeaponRules {
 export type SelectResult = 'switched' | 'same' | 'empty-slot' | 'invalid';
 export type ArsenalFireResult = FireResult | 'switching';
 
+/** Resultado de recibir un arma: nueva en su ranura, o convertida en munición si ya se tenía. */
+export interface GrantResult {
+  kind: 'new' | 'ammo';
+  slot: number;
+  added: number;
+}
+
 export interface Resupply<Def> {
   def: Def;
   slot: number;
@@ -91,6 +98,39 @@ export class Arsenal<Def extends ArsenalWeapon = ArsenalWeapon> {
   /** Avanza el tiempo del arma equipada. Devuelve `true` al terminar una recarga. */
   update(now: number): boolean {
     return this.current.update(now);
+  }
+
+  /** Ranura en la que está un arma, o -1 si Alex no la tiene. */
+  slotOf(id: string): number {
+    return this.slots.findIndex((weapon) => weapon?.def.id === id);
+  }
+
+  /** Identificadores de las armas que tiene. */
+  ownedIds(): string[] {
+    return this.slots.filter((w): w is WeaponState<Def> => w !== null).map((w) => w.def.id);
+  }
+
+  /**
+   * Entrega un arma en su ranura, con el cargador lleno y la reserva
+   * inicial de su definición. Si ya la tiene, se convierte en munición
+   * para ella (`added` puede ser 0 si la reserva ya estaba llena).
+   */
+  grant(def: Def, slot: number): GrantResult {
+    if (!Number.isInteger(slot) || slot < 0 || slot >= this.slots.length) throw new Error(`Arsenal: ranura ${slot} no válida`);
+    const owned = this.slotOf(def.id);
+    if (owned >= 0) {
+      const weapon = this.slots[owned] as WeaponState<Def>;
+      return { kind: 'ammo', slot: owned, added: weapon.addReserve(def.pickupRounds) };
+    }
+    if (this.slots[slot]) throw new Error(`Arsenal: la ranura ${slot} ya está ocupada`);
+    this.slots[slot] = new WeaponState(def);
+    return { kind: 'new', slot, added: 0 };
+  }
+
+  /** Munición para un arma concreta. Devuelve cuánta cupo (0 si no la tiene o está llena). */
+  addAmmo(id: string, rounds: number): number {
+    const weapon = this.slots[this.slotOf(id)];
+    return weapon ? weapon.addReserve(rounds) : 0;
   }
 
   /**

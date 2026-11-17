@@ -20,30 +20,39 @@ const FIRST_FEET = 74;
 const AIM_X = (i: number): number => 22 + i * 38;
 const RELOAD_X = AIM_X(7) + 14;
 const INFO_X = 330;
+/** Armas por página: caben cuatro filas en la pantalla. */
+const PER_PAGE = 4;
+const PAGES = Math.ceil(WEAPONS.length / PER_PAGE);
 
 /**
  * Revisión del arsenal (`?scene=arsenal`): cada arma en manos de Alex en
  * los 7 ángulos, disparando con su fogonazo y su retroceso, su recarga
  * animada y su ficha de datos. Sirve para revisar el arte y como captura.
+ * Con seis armas se reparte en dos páginas (teclas 1 y 2).
  */
 export class ArsenalScene extends Phaser.Scene {
   private cells: Cell[] = [];
   private freeze = false;
+  private page = 0;
+  private weapons: readonly WeaponDef[] = [];
 
   constructor() {
     super(SCENE.arsenal);
   }
 
-  create(): void {
+  create(data?: { page?: number }): void {
     const options = this.registry.get('launch') as LaunchOptions;
+    this.page = Math.min(PAGES - 1, Math.max(0, data?.page ?? 0));
+    this.weapons = WEAPONS.slice(this.page * PER_PAGE, (this.page + 1) * PER_PAGE);
+    this.lastShot.clear();
     this.freeze = options.freeze;
     this.cells = [];
     this.cameras.main.setBackgroundColor(colorNumber('asph4'));
     const skin = SKINS[options.skin];
 
-    this.text(4, 3, `ARSENAL: CUATRO ARMAS EN LOS 7 ANGULOS       J: JUGAR   G: GALERIA`);
+    this.text(4, 3, `ARSENAL ${this.page + 1}/${PAGES}: ARMAS EN LOS 7 ANGULOS   1-2: PAGINA   J: JUGAR   G: GALERIA`);
     this.text(RELOAD_X, 12, 'RECARGA').setOrigin(0.5, 0).setTint(colorNumber('grey2'));
-    WEAPONS.forEach((weapon, row) => this.buildRow(skin, weapon, row));
+    this.weapons.forEach((weapon, row) => this.buildRow(skin, weapon, row));
 
     this.bindKeys(options);
     // La primera pasada dispara todas las armas: con `freeze=1` queda fijo el fogonazo.
@@ -62,7 +71,7 @@ export class ArsenalScene extends Phaser.Scene {
 
     const top = feet - 44;
     this.add.image(INFO_X, top, ATLAS_KEY, weapon.icon).setOrigin(0, 0);
-    this.text(INFO_X + 34, top + 1, `${row + 1}  ${weapon.name}`).setTint(colorNumber('light2'));
+    this.text(INFO_X + 34, top + 1, `${this.page * PER_PAGE + row + 1}  ${weapon.name}`).setTint(colorNumber('light2'));
     const perMinute = Math.round(60000 / weapon.fireIntervalMs);
     const damage = weapon.pellets > 1 ? `${weapon.damage}X${weapon.pellets}` : String(weapon.damage);
     const lines = [
@@ -91,7 +100,7 @@ export class ArsenalScene extends Phaser.Scene {
   /** Cada arma dispara a su ritmo (la escopeta más despacio) y recarga con su duración real. */
   private syncCells(time: number): void {
     const fired = new Set<string>();
-    for (const weapon of WEAPONS) {
+    for (const weapon of this.weapons) {
       const every = Math.max(500, weapon.fireIntervalMs * 3);
       if (time - (this.lastShot.get(weapon.id) ?? -Infinity) >= every) {
         this.lastShot.set(weapon.id, time);
@@ -120,5 +129,7 @@ export class ArsenalScene extends Phaser.Scene {
       this.scene.start(SCENE.game);
     });
     keyboard.on('keydown-G', () => this.scene.start(SCENE.gallery));
+    keyboard.on('keydown-ONE', () => this.page !== 0 && this.scene.restart({ page: 0 }));
+    keyboard.on('keydown-TWO', () => this.page !== 1 && this.scene.restart({ page: 1 }));
   }
 }

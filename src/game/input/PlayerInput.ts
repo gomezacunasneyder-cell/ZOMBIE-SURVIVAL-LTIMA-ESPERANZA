@@ -5,22 +5,48 @@ import { WEAPON_SLOTS } from '../../content/weapons';
 export interface InputFrame {
   direction: -1 | 0 | 1;
   run: boolean;
+  /** Caminar en silencio (S o Ctrl): más despacio, sin ruido de pasos. */
+  sneak: boolean;
   jumpPressed: boolean;
   jumpHeld: boolean;
   firePressed: boolean;
   fireHeld: boolean;
   reloadPressed: boolean;
-  /** Ranura de arma elegida este fotograma (0–3), o `null`. */
+  /** Ranura de arma elegida este fotograma (0–5), o `null`. */
   slotPressed: number | null;
   /** Rueda del ratón: siguiente (1) o anterior (-1) arma. */
   cycle: -1 | 0 | 1;
+  /** E mantenida: abrir cajas de suministros. */
+  interactHeld: boolean;
+  /** Q: usar un botiquín. */
+  medkitPressed: boolean;
   /** Cualquier tecla de confirmación (para reintentar tras morir). */
   confirmPressed: boolean;
 }
 
-const KEYS = 'A,D,LEFT,RIGHT,SPACE,W,UP,SHIFT,R,ENTER,ONE,TWO,THREE,FOUR';
-type KeyName = 'A' | 'D' | 'LEFT' | 'RIGHT' | 'SPACE' | 'W' | 'UP' | 'SHIFT' | 'R' | 'ENTER' | 'ONE' | 'TWO' | 'THREE' | 'FOUR';
-const SLOT_KEYS: KeyName[] = ['ONE', 'TWO', 'THREE', 'FOUR'];
+const KEYS = 'A,D,LEFT,RIGHT,SPACE,W,UP,SHIFT,R,ENTER,ONE,TWO,THREE,FOUR,FIVE,SIX,S,CTRL,E,Q';
+type KeyName =
+  | 'A'
+  | 'D'
+  | 'LEFT'
+  | 'RIGHT'
+  | 'SPACE'
+  | 'W'
+  | 'UP'
+  | 'SHIFT'
+  | 'R'
+  | 'ENTER'
+  | 'ONE'
+  | 'TWO'
+  | 'THREE'
+  | 'FOUR'
+  | 'FIVE'
+  | 'SIX'
+  | 'S'
+  | 'CTRL'
+  | 'E'
+  | 'Q';
+const SLOT_KEYS: KeyName[] = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX'];
 
 /**
  * Mapa de acciones: el resto del juego no sabe qué tecla hace qué.
@@ -92,6 +118,7 @@ export class PlayerInput {
     const jumpPressed = just('SPACE') || just('W') || just('UP');
     const enterPressed = just('ENTER');
     const reloadPressed = just('R');
+    const medkitPressed = just('Q');
 
     let slotPressed: number | null = null;
     for (let i = 0; i < WEAPON_SLOTS; i++) {
@@ -106,7 +133,8 @@ export class PlayerInput {
 
     return {
       direction,
-      run: k.SHIFT.isDown,
+      run: k.SHIFT.isDown && !(k.S.isDown || k.CTRL.isDown),
+      sneak: k.S.isDown || k.CTRL.isDown,
       jumpPressed,
       jumpHeld: k.SPACE.isDown || k.W.isDown || k.UP.isDown,
       firePressed,
@@ -114,6 +142,8 @@ export class PlayerInput {
       reloadPressed,
       slotPressed,
       cycle,
+      interactHeld: k.E.isDown,
+      medkitPressed,
       confirmPressed: enterPressed || reloadPressed || jumpPressed || firePressed,
     };
   }

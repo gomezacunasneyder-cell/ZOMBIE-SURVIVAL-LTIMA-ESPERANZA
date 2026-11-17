@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { colorNumber } from '../../art/palette';
 import { EXPLOSION, explosionDamage } from '../../content/hazards';
+import type { BlastDef } from '../../content/weapons';
 import { ATLAS_KEY, MASK } from '../boot/registerArt';
 import { SFX, playSfxAt } from '../boot/registerAudio';
 import { DEPTH } from '../world/depths';
@@ -16,6 +17,8 @@ export interface Blast {
   /** Daño a una distancia dada, para enemigos y para Alex. */
   enemyDamageAt(distance: number): number;
   playerDamageAt(distance: number): number;
+  /** Empuje a los enemigos alcanzados, en px/s. */
+  knockback: number;
 }
 
 interface Burning {
@@ -100,22 +103,7 @@ export class ExplosionSystem {
     barrel.shadow.destroy();
     (barrel.zone.body as Phaser.Physics.Arcade.StaticBody).enable = false;
 
-    this.scene.add
-      .sprite(x, this.groundY - 14, ATLAS_KEY, 'fx/explosion/0')
-      .setDepth(DEPTH.explosion)
-      .play('fx/explosion')
-      .once('animationcomplete', (_animation: unknown, _frame: unknown, sprite: Phaser.GameObjects.Sprite) => sprite.destroy());
-    this.scene.add.image(x, this.groundY + 3, ATLAS_KEY, 'decal/scorch').setDepth(DEPTH.decal + 0.1);
-    this.fx.sparkBurst(x, y);
-    this.fx.sparkBurst(x, y - 8);
-    playSfxAt(this.scene, SFX.explosion, x, 0.9, 900);
-
-    // Destello: mucha luz de golpe que se apaga en un tercio de segundo.
-    this.flashes.push({
-      light: this.lighting.addLight(MASK.radialHuge, x, y, { intensity: 1 }),
-      glow: this.lighting.addGlow(MASK.radialLarge, x, y, colorNumber('light2'), 0.7),
-      startedAt: now,
-    });
+    this.burst(x, this.groundY - 14, y);
 
     // Combustible ardiendo unos segundos.
     const flame = this.scene.add.sprite(x, this.groundY + 1, ATLAS_KEY, 'fx/fire/0').setOrigin(0.5, 1).setDepth(this.groundY + 1.2).play('fx/fire');
@@ -132,11 +120,57 @@ export class ExplosionSystem {
       y,
       enemyDamageAt: (distance) => explosionDamage(distance, EXPLOSION.enemyDamage),
       playerDamageAt: (distance) => explosionDamage(distance, EXPLOSION.playerDamage),
+      knockback: EXPLOSION.knockback,
     });
+    this.chain(x, EXPLOSION.radius);
+  }
 
-    // Reacción en cadena con un pequeño retardo.
+  /**
+   * Explosión de un cohete en el aire o contra el suelo: el mismo estallido
+   * de luz y metralla, sin charco de combustible. También hace estallar
+   * los bidones que alcance.
+   */
+  blastAt(x: number, y: number, def: BlastDef): void {
+    this.count += 1;
+    const nearGround = y >= this.groundY - 20;
+    // Solo deja marca en el asfalto si estalla cerca del suelo.
+    this.burst(x, Math.min(y, this.groundY - 14), y, nearGround);
+    const tuning = { ...EXPLOSION, radius: def.radius };
+    this.onBlast({
+      x,
+      y,
+      enemyDamageAt: (distance) => explosionDamage(distance, def.enemyDamage, tuning),
+      playerDamageAt: (distance) => explosionDamage(distance, def.playerDamage, tuning),
+      knockback: def.knockback,
+    });
+    this.chain(x, def.radius);
+  }
+
+  /** Bola de fuego, marca en el suelo, chispas, estruendo y destello de luz. */
+  private burst(x: number, spriteY: number, y: number, scorch = true): void {
+    const now = this.scene.time.now;
+    this.scene.add
+      .sprite(x, spriteY, ATLAS_KEY, 'fx/explosion/0')
+      .setDepth(DEPTH.explosion)
+      .play('fx/explosion')
+      .once('animationcomplete', (_animation: unknown, _frame: unknown, sprite: Phaser.GameObjects.Sprite) => sprite.destroy());
+    if (scorch) this.scene.add.image(x, this.groundY + 3, ATLAS_KEY, 'decal/scorch').setDepth(DEPTH.decal + 0.1);
+    this.fx.sparkBurst(x, y);
+    this.fx.sparkBurst(x, y - 8);
+    playSfxAt(this.scene, SFX.explosion, x, 0.9, 900);
+
+    // Destello: mucha luz de golpe que se apaga en un tercio de segundo.
+    this.flashes.push({
+      light: this.lighting.addLight(MASK.radialHuge, x, y, { intensity: 1 }),
+      glow: this.lighting.addGlow(MASK.radialLarge, x, y, colorNumber('light2'), 0.7),
+      startedAt: now,
+    });
+  }
+
+  /** Reacción en cadena con un pequeño retardo. */
+  private chain(x: number, radius: number): void {
     for (const other of this.explosives) {
-      if (other.exploded || Math.abs(other.x - x) > EXPLOSION.radius) continue;
+      if (other.exploded || Math.abs(other.x - x) > radius) continue;
       this.scene.time.delayedCall(EXPLOSION.chainDelayMs, () => this.explode(other));
     }
   }

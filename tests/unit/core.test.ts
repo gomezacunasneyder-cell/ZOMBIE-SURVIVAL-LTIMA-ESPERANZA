@@ -126,8 +126,14 @@ describe('sonido sintetizado', () => {
 
 describe('opciones de arranque', () => {
   it('lee la escena y la congelación de la URL', () => {
-    expect(readLaunchOptions('')).toEqual({ scene: 'game', freeze: false, test: false, skin: 'detallado', night: null });
-    expect(readLaunchOptions('?scene=gallery&freeze=1')).toEqual({ scene: 'gallery', freeze: true, test: false, skin: 'detallado', night: null });
-    expect(readLaunchOptions('?scene=otra')).toEqual({ scene: 'game', freeze: false, test: false, skin: 'detallado', night: null });
+    const BASE = { loadout: 'inicial', seed: null, airdropNow: false, mode: 'campaign', startWave: 0 } as const;
+    expect(readLaunchOptions('')).toEqual({ scene: 'game', freeze: false, test: false, skin: 'detallado', night: null, ...BASE });
+    expect(readLaunchOptions('?scene=gallery&freeze=1')).toEqual({ scene: 'gallery', freeze: true, test: false, skin: 'detallado', night: null, ...BASE });
+    expect(readLaunchOptions('?arsenal=completo&semilla=7&suministros=ya')).toMatchObject({ loadout: 'completo', seed: 7, airdropNow: true });
+    expect(readLaunchOptions('?arsenal=basico').loadout).toBe('basico');
+    expect(readLaunchOptions('?modo=oleadas&oleada=4')).toMatchObject({ mode: 'survival', startWave: 3 });
+    expect(readLaunchOptions('?modo=oleadas&oleada=x').startWave).toBe(0);
+    expect(readLaunchOptions('?semilla=abc').seed).toBeNull();
+    expect(readLaunchOptions('?scene=otra')).toEqual({ scene: 'game', freeze: false, test: false, skin: 'detallado', night: null, ...BASE });
   });
 });

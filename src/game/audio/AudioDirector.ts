@@ -26,7 +26,16 @@ export interface AudioScene {
   /** Zombis persiguiendo a Alex: gobiernan la intensidad de la música. */
   chasing: number;
   playerAlive: boolean;
+  /** Hay un lanzamiento de suministros en marcha: la música sube de ritmo. */
+  airdrop: boolean;
+  /** Peligro 0–1 (horda): tensión y combate al máximo. */
+  danger: number;
+  /** Silencio 0–1 antes de la llegada del jefe: la música se apaga. */
+  hush: number;
 }
+
+/** Distancia a la que se empieza a oír el helicóptero: se le oye llegar antes de verlo. */
+const HELICOPTER_REACH = 1100;
 
 /** Velocidad a la que un bucle cambia de nivel, en unidades por segundo. */
 const FADE_RATE = 0.9;
@@ -80,7 +89,7 @@ export class AudioDirector {
     this.setTarget(LOOP.wind, 0.35 + gustAt(world.timeMs) * 0.65);
     this.setTarget(LOOP.night, world.night);
 
-    const helicopter = positional(world.helicopterX, listener, 620);
+    const helicopter = positional(world.helicopterX, listener, HELICOPTER_REACH);
     this.setTarget(LOOP.helicopter, helicopter.gain)?.sound.setPan(helicopter.pan);
 
     let alarmGain = 0;
@@ -95,9 +104,13 @@ export class AudioDirector {
     this.setTarget(LOOP.alarm, alarmGain)?.sound.setPan(alarmPan);
 
     // Música: tensión de fondo que crece de noche; combate cuando persiguen a Alex.
-    const combat = world.playerAlive ? Math.min(1, world.chasing / 3) : 0;
-    this.setTarget(LOOP.tension, world.playerAlive ? 0.55 + world.night * 0.3 + combat * 0.15 : 0.3);
-    this.setTarget(LOOP.combat, combat);
+    // Durante un lanzamiento de suministros la música de combate nunca baja del todo.
+    const chase = Math.min(1, world.chasing / 3);
+    const combat = world.playerAlive ? Math.max(chase, world.airdrop ? 0.55 : 0, world.danger) : 0;
+    const quiet = 1 - world.hush;
+    const tension = world.playerAlive ? Math.max(0.55 + world.night * 0.3 + combat * 0.15, world.danger) : 0.3;
+    this.setTarget(LOOP.tension, tension * quiet);
+    this.setTarget(LOOP.combat, combat * quiet);
 
     const step = (FADE_RATE * deltaMs) / 1000;
     for (const channel of this.channels.values()) {

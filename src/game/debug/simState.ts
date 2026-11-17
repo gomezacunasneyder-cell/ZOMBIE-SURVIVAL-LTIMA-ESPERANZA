@@ -58,5 +58,40 @@ export interface SimState {
   };
   /** Todas las ranuras. */
   arsenal: ({ id: string; magazine: number; reserve: number; fired: number } | null)[];
-  zombies: { x: number; health: number; state: string; alive: boolean }[];
+  zombies: { kind: string; x: number; y: number; health: number; state: string; alive: boolean; target: number | null; animation: string }[];
+  /** Ruido de Alex (0–1), ruidos emitidos desde el inicio y si camina en silencio. */
+  noise: { level: number; emitted: number; sneaking: boolean };
+  barricades: { x: number; hits: number; broken: boolean }[];
+  /** Lanzamiento de Cóndor 7: fase, posición del helicóptero y cajas. */
+  airdrop: {
+    phase: string;
+    heliX: number | null;
+    drops: number;
+    randomEnabled: boolean;
+    crates: { x: number; y: number; state: string; items: string[]; rarity: string }[];
+    /** Progreso de apertura de la caja (0–1), o `null`. */
+    opening: number | null;
+  };
+  medkits: { count: number; using: boolean };
+  /** Enemigos en llamas. */
+  burning: number;
+  /** Reutilización de enemigos: objetos creados, apariciones y retirados en reserva. */
+  pool: { created: number; spawned: number; pooled: number };
+  /** Enemigos vivos. */
+  alive: number;
+  /** Modo supervivencia, o `null` en la campaña. */
+  survival: {
+    wave: number;
+    phase: string;
+    remaining: number;
+    total: number;
+    kills: number;
+    timeLeft: number;
+    horde: string;
+    alert: number;
+    danger: number;
+    finished: boolean;
+    boss: boolean;
+    bossRevealed: boolean;
+  } | null;
 }

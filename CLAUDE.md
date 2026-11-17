@@ -31,10 +31,16 @@ Shooter de supervivencia 2D de desplazamiento lateral en pixel art. Phaser 3.90.
 
 Las pruebas de navegador usan `window.__ZS__` (solo en desarrollo). Esperar siempre por el **tiempo del juego** (`state().time`), no por tiempo real: con la máquina cargada el juego va más lento y las pausas fijas fallan. Las funciones que se pasan a `until()` se envían al navegador como texto y no pueden usar variables de la prueba.
 
-Parámetros de URL: `?test=1` (sin enemigos), `&hora=noche|atardecer|0.5`, `&skin=clasico`, `?scene=gallery`, `?scene=compare`, `?scene=arsenal`.
+Parámetros de URL: `?test=1` (sin enemigos ni lanzamientos automáticos), `&hora=noche|atardecer|0.5`, `&skin=clasico`, `&arsenal=basico|completo` (por defecto solo la pistola; `openGame` de las pruebas añade `basico`), `&semilla=N` (partida reproducible), `&suministros=ya` (Cóndor 7 llega al empezar), `?modo=oleadas` (modo supervivencia) con `&oleada=N` (empieza en la oleada N; 5 = horda), `?scene=gallery`, `?scene=compare`, `?scene=arsenal` (dos páginas: teclas 1 y 2), `?scene=bestiario`.
 
-Añadir un arma: datos en `src/content/weapons.ts`, dibujo en `src/art/painters/guns.ts` y voz en `src/audio/synth/gunshot.ts` (las pruebas avisan si falta alguna).
+Añadir un arma: datos en `src/content/weapons.ts`, dibujo en `src/art/painters/guns.ts` (o `heavyGuns.ts`), voz en `src/audio/synth/gunshot.ts` y su peso en `LOOT_TABLE` de `src/content/supplies.ts` (las pruebas avisan si falta alguna pieza).
 
 ## Estado
 
-Fases 0, 1 y 2 completadas y aprobadas. Fase 3: el arsenal (4 armas, cambio de arma, HUD de combate) está terminado y **pendiente de aprobación** (`docs/decisiones/0004-fase-3-arsenal.md`); el resto de la Fase 3 (arrojadizos, inventario, botiquines, Cóndor 7) no se ha empezado. El usuario numeró este encargo como «Fase 2»: en el plan corresponde a la Fase 3.
+Fases 0, 1 y 2 completadas y aprobadas. Fase 3: arsenal aprobado y subido; Cóndor 7, cajas de suministros, botiquines, lanzallamas y lanzacohetes terminados y **pendientes de aprobación** (`docs/decisiones/0006-fase-3-suministros.md`); faltan arrojadizos, inventario (Tab) y piezas. Fase 4 terminada y **pendiente de aprobación**: enemigos e IA (`docs/decisiones/0005-fase-4-enemigos.md`) y modo supervivencia con oleadas, horda final, llegada del jefe y prueba de estrés (`docs/decisiones/0007-fase-4-oleadas.md`). El combate contra EL DEVORADOR es la Fase 6. El usuario numera sus encargos con una fase menos que el plan (su «Fase 3» es la Fase 4 del plan).
+
+Equilibrio de los suministros (calendario, vuelo, caída, botín por rarezas, emboscada): todo en `src/content/supplies.ts`; reglas puras en `src/core/supply/`.
+
+Oleadas y recompensas: `src/content/waves.ts`; reglas puras en `src/core/waves/WaveRun.ts`. Los enemigos se reutilizan (depósito en `ZombieDirector`): no destruir zombis a mano, salvo `clear()`.
+
+Añadir un enemigo: datos en `src/content/enemies.ts` (activa comportamientos de `src/core/ai/EnemyBrain.ts`) y animaciones en `src/art/enemyArt.ts`.
