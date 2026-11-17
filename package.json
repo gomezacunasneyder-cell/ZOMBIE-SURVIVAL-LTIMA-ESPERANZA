@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run test",
-    "capturas": "node scripts/capturar.mjs && node scripts/capturar-mochila.mjs"
+    "capturas": "node scripts/capturar.mjs && node scripts/capturar-mochila.mjs && node scripts/capturar-jefe.mjs"
   },
   "dependencies": {
     "phaser": "3.90.0"

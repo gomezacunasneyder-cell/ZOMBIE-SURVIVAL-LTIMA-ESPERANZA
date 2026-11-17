@@ -68,6 +68,8 @@ export class ThrowableSystem {
   private readonly flying: Flying[] = [];
   private readonly fires: FirePatch[] = [];
   private thrown = 0;
+  /** Cada cuarto de segundo, el charco de fuego también quema a otros (EL DEVORADOR). */
+  onFireTick: ((x: number, half: number, now: number) => void) | null = null;
   private exploded = 0;
 
   constructor(
@@ -205,6 +207,7 @@ export class ThrowableSystem {
       for (const zombie of this.deps.zombies()) {
         if (zombie.alive && Math.abs(zombie.x - fire.x) <= half) this.deps.burns.ignite(zombie, def.burn, now);
       }
+      this.onFireTick?.(fire.x, half, now);
       const player = this.deps.player();
       if (player.alive && Math.abs(player.x - fire.x) <= half - 4 && now >= fire.nextHurtAt) {
         fire.nextHurtAt = now + PLAYER_HURT_MS;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildArtCatalog } from '../../src/art/catalog';
-import { DEVOURER_FRAMES, FORTIFICATION_FRAMES } from '../../src/art/survivalArt';
+import { FORTIFICATION_FRAMES } from '../../src/art/survivalArt';
 import { SURVIVAL_ARENA } from '../../src/content/chapters/survival';
 import { SOLIDS, hitsToBreak } from '../../src/content/level';
 import { SURVIVAL_WAVES, WAVE_TIMING, rewardLoot } from '../../src/content/waves';
@@ -74,12 +74,16 @@ function simulate(startAt = 0, killDelayMs = 400) {
   const pending: number[] = [];
   let maxAlive = 0;
   let maxAliveIndex = 0;
+  let bossAt = Infinity;
   for (let t = 0; t < 30 * 60_000 && run.phase !== 'done'; t += 50) {
     while (pending.length > 0 && (pending[0] as number) <= t) {
       pending.shift();
       run.onKill();
     }
+    // El jefe cae un minuto después de aparecer.
+    if (run.phase === 'boss' && t - bossAt >= 60_000) events.push(...run.defeatBoss(t).map((e) => ({ ...e, at: t })));
     for (const e of run.update(t, pending.length)) {
+      if (e.type === 'boss') bossAt = t;
       events.push({ ...e, at: t });
       if (e.type === 'spawn') pending.push(t + killDelayMs);
     }
@@ -110,14 +114,20 @@ describe('desarrollo de una partida', () => {
     expect(spawns).toHaveLength(SURVIVAL_WAVES.reduce((sum, w) => sum + waveTotal(w), 0));
   });
 
-  it('respeta aviso, descanso, alarma y duración del jefe', () => {
+  it('respeta aviso, descanso y alarma; el jefe solo termina al caer', () => {
     const { events } = simulate();
     const at = (type: string, wave?: number): number =>
       events.find((e) => e.type === type && (wave === undefined || (e as { wave?: number }).wave === wave))!.at;
     expect(at('fight', 0) - at('intro', 0)).toBeGreaterThanOrEqual(WAVE_TIMING.introMs);
     expect(at('intro', 1) - at('cleared', 0)).toBeGreaterThanOrEqual(SURVIVAL_WAVES[0]!.restMs);
     expect(at('fight', 4) - at('alarm', 4)).toBeGreaterThanOrEqual(WAVE_TIMING.alarmMs);
-    expect(at('done') - at('boss')).toBeGreaterThanOrEqual(WAVE_TIMING.bossMs);
+    expect(at('done') - at('boss')).toBeGreaterThanOrEqual(60_000);
+    // Sin abatirlo, la partida no termina nunca.
+    const run = new WaveRun(SURVIVAL_WAVES, WAVE_TIMING, new Rng(1), 0, 0);
+    expect(run.skipToBoss(0)).toEqual([{ type: 'boss' }]);
+    expect(run.update(10 * 60_000, 0)).toEqual([]);
+    expect(run.phase).toBe('boss');
+    expect(run.defeatBoss(10 * 60_000)).toEqual([{ type: 'done' }]);
   });
 
   it('la horda entra por los dos lados por igual y en grupos', () => {
@@ -171,11 +181,7 @@ describe('escenario y arte del modo supervivencia', () => {
 
   it('todo el arte del modo existe', () => {
     for (const solid of SURVIVAL_ARENA.solids) expect(catalog.sprites.has(SOLIDS[solid.kind].frame)).toBe(true);
-    for (const name of [...FORTIFICATION_FRAMES, DEVOURER_FRAMES.dark, DEVOURER_FRAMES.eyes]) expect(catalog.sprites.has(name), name).toBe(true);
-    // Los ojos se encienden: los dos fotogramas son distintos.
-    const dark = catalog.sprites.get(DEVOURER_FRAMES.dark)!;
-    const eyes = catalog.sprites.get(DEVOURER_FRAMES.eyes)!;
-    expect(Buffer.from(dark.data).equals(Buffer.from(eyes.data))).toBe(false);
+    for (const name of FORTIFICATION_FRAMES) expect(catalog.sprites.has(name), name).toBe(true);
     // La barricada se ve más dañada en cada estado.
     const stages = FORTIFICATION_FRAMES.map((name) => Buffer.from(catalog.sprites.get(name)!.data).toString('base64'));
     expect(new Set(stages).size).toBe(FORTIFICATION_FRAMES.length);

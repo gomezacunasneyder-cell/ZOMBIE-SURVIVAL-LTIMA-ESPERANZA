@@ -65,10 +65,13 @@ Enemigos e IA en [decisiones/0005-fase-4-enemigos.md](decisiones/0005-fase-4-ene
 - Puntos de control, guardado con ranuras, menú principal, pausa y ajustes.
 - Banco de trabajo y mejoras.
 
-### Fase 6 · El origen
+### Fase 6 · El origen — JEFE TERMINADO, pendiente de aprobación
 
-- Capítulo 5 y EL DEVORADOR con sus tres fases.
-- Final y créditos.
+EL DEVORADOR en [decisiones/0009-fase-6-devorador.md](decisiones/0009-fase-6-devorador.md): presentación, tres fases, cinco ataques, final con la grabación militar y «CONTINUARÁ». Se adelantó a la Fase 5 a petición del usuario, así que se juega en el refugio del modo supervivencia (tras la horda o con `?modo=jefe`).
+
+- Capítulo 5 (laboratorio de «Origen»): pendiente, depende de la campaña.
+- ~~EL DEVORADOR con sus tres fases.~~
+- ~~Final~~ y créditos (créditos pendientes).
 
 ### Fase 7 · Pulido y publicación
 

@@ -6,12 +6,13 @@ import { SFX, playSfxAt } from '../boot/registerAudio';
 import { GAME_WIDTH } from '../config';
 import type { Player } from '../entities/Player';
 import type { Zombie } from '../entities/Zombie';
+import type { BarricadeSystem } from './BarricadeSystem';
 import type { CameraRig } from './CameraRig';
 import type { Blast } from './ExplosionSystem';
 import type { FxSystem } from './FxSystem';
 import type { NoiseSystem } from './NoiseSystem';
 import type { ScrapSystem } from './ScrapSystem';
-import type { ZombieDirector } from './ZombieDirector';
+import type { DirectorEvents, ZombieDirector } from './ZombieDirector';
 
 export interface CombatDeps {
   player: Player;
@@ -20,6 +21,7 @@ export interface CombatDeps {
   cameraRig: CameraRig;
   noise: NoiseSystem;
   scrap: ScrapSystem;
+  barricades: BarricadeSystem;
   bus: EventBus<GameEvents>;
   groundY: number;
   /** Alex acaba de morir. */
@@ -31,10 +33,27 @@ export interface CombatDeps {
  * las piezas que sueltan al morir) y los efectos de cada explosión.
  */
 export class CombatSystem {
+  /** Otros que reciben las explosiones (EL DEVORADOR). */
+  readonly blastTargets: ((blast: Blast) => void)[] = [];
+
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly deps: CombatDeps,
   ) {}
+
+  /** Lo que el director de enemigos pide resolver en este fotograma. */
+  directorEvents(now: number): DirectorEvents {
+    return {
+      strike: (zombie) => this.strike(zombie, now),
+      swing: (zombie) => this.swing(zombie),
+      smash: (zombie, barricade) => {
+        // Solo el mazazo del mutante sacude la pantalla: en la horda golpean decenas a la vez.
+        this.deps.cameraRig.addTrauma(zombie.def.id === 'mutant' ? 0.35 : 0.03);
+        this.deps.noise.emit(barricade.x, zombie.def.voice, 'creature', now, false);
+        this.deps.barricades.hit(barricade, now);
+      },
+    };
+  }
 
   /** Un enemigo alcanza a Alex con su golpe. */
   strike(zombie: Zombie, now: number): void {
@@ -80,6 +99,7 @@ export class CombatSystem {
       const damage = blast.enemyDamageAt(distance);
       if (damage > 0) this.damageZombie(zombie, damage, Math.sign(zombie.x - blast.x || 1) * blast.knockback, now, blast.x);
     }
+    for (const target of this.blastTargets) target(blast);
     const reach = Math.hypot(player.x - blast.x, player.centerY - blast.y);
     const damage = player.alive ? blast.playerDamageAt(reach) : 0;
     if (damage > 0) this.hurtPlayer(damage, blast.x, now);

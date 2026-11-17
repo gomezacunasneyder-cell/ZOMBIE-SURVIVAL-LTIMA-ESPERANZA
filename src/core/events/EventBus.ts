@@ -80,5 +80,11 @@ export interface GameEvents extends Record<string, unknown> {
   /** Intensidad 0–1 del aviso de peligro (marco rojo que late). */
   danger: { level: number };
   /** Fin del modo supervivencia, con el resumen de la partida. */
-  survivalEnd: { waves: number; kills: number; timeMs: number };
+  survivalEnd: { waves: number; kills: number; timeMs: number; victory: boolean };
+  /** Barra de vida de EL DEVORADOR. `exposed`: agotado, recibe el doble de daño. */
+  boss: { visible: boolean; name: string; title: string; health: number; max: number; phase: number; exposed: boolean };
+  /** Velo oscuro sobre la pantalla (0–1). */
+  dim: { level: number };
+  /** Franjas de cine durante el final. */
+  cinematic: { on: boolean };
 }

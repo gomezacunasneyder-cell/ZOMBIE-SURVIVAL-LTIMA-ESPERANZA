@@ -22,7 +22,7 @@ const PADDING = 1;
  * Un único atlas permite a Phaser dibujar casi todo en un lote.
  * Función pura: devuelve los bytes y la posición de cada fotograma.
  */
-export function packAtlas(sprites: ReadonlyMap<string, PixelBuffer>, atlasWidth = 512): PackedAtlas {
+export function packAtlas(sprites: ReadonlyMap<string, PixelBuffer>, atlasWidth = 1024): PackedAtlas {
   const entries = [...sprites.entries()].sort(
     (a, b) => b[1].height - a[1].height || a[0].localeCompare(b[0]),
   );

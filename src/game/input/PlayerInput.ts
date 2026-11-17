@@ -28,6 +28,27 @@ export interface InputFrame {
   confirmPressed: boolean;
 }
 
+/** Sin hacer nada: durante las cinemáticas Alex no se controla. */
+export function idleInput(): InputFrame {
+  return {
+    direction: 0,
+    run: false,
+    sneak: false,
+    jumpPressed: false,
+    jumpHeld: false,
+    firePressed: false,
+    fireHeld: false,
+    reloadPressed: false,
+    slotPressed: null,
+    cycle: 0,
+    interactHeld: false,
+    medkitPressed: false,
+    throwPressed: null,
+    inventoryPressed: false,
+    confirmPressed: false,
+  };
+}
+
 const KEYS = 'A,D,LEFT,RIGHT,SPACE,W,UP,SHIFT,R,ENTER,ONE,TWO,THREE,FOUR,FIVE,SIX,S,CTRL,E,Q,G,F,TAB';
 type KeyName =
   | 'A'

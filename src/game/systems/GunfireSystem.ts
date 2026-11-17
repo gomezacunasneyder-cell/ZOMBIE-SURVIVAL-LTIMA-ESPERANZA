@@ -131,6 +131,35 @@ export class GunfireSystem {
     if (burn && zombie.alive) this.deps.burns.ignite(zombie, burn, now);
   }
 
+  /**
+   * Las balas también alcanzan a otro objetivo (EL DEVORADOR). Las llamas
+   * le prenden fuego y atraviesan; el cohete estalla contra él.
+   */
+  wireTarget(sprite: Phaser.Physics.Arcade.Sprite, hit: (damage: number, now: number, source: 'bullet' | 'fire') => number): void {
+    const { bullets, fx, explosions } = this.deps;
+    this.scene.physics.add.overlap(bullets.group, sprite, (first, second) => {
+      const bullet = (BulletSystem.isBullet(first as Phaser.GameObjects.GameObject) ? first : second) as Phaser.Physics.Arcade.Image;
+      if (!bullet.active) return;
+      const data = BulletSystem.dataOf(bullet);
+      const damage = BulletSystem.damageOf(bullet);
+      const now = this.scene.time.now;
+      if (data.projectile === 'flame') {
+        if (data.touched.has(sprite)) return;
+        data.touched.add(sprite);
+        hit(damage, now, 'fire');
+        return;
+      }
+      bullets.remove(bullet);
+      if (hit(damage, now, 'bullet') > 0) fx.fleshImpact(bullet.x, bullet.y, damage);
+      else fx.hardImpact(bullet.x, bullet.y);
+      if (data.projectile === 'rocket' && data.blast) explosions.blastAt(bullet.x, bullet.y, data.blast);
+      else if (now - this.lastFleshSound >= IMPACT_SOUND_GAP_MS) {
+        this.lastFleshSound = now;
+        playSfxAt(this.scene, SFX.fleshHit, bullet.x, 0.4);
+      }
+    });
+  }
+
   update(now: number): void {
     const light = this.deps.muzzleLight;
     if (light.enabled && now >= this.muzzleLightUntil) light.enabled = false;

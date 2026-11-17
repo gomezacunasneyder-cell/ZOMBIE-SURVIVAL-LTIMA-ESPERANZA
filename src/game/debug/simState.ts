@@ -104,5 +104,21 @@ export interface SimState {
     finished: boolean;
     boss: boolean;
     bossRevealed: boolean;
+    /** Combate contra EL DEVORADOR, o `null` antes de que aparezca. */
+    fight: {
+      stage: string;
+      state: string;
+      step: string;
+      phase: number;
+      health: number;
+      max: number;
+      x: number;
+      facing: number;
+      taken: number;
+      minions: number;
+      hazards: { waves: number; bile: number; puddles: number; spikes: number };
+      cinematic: boolean;
+      animation: string;
+    } | null;
   } | null;
 }

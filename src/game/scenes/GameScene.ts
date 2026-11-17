@@ -17,7 +17,7 @@ import { installGameHooks } from '../debug/gameHooks';
 import { updateTestHook, type LaunchOptions } from '../debug/testHook';
 import { Player } from '../entities/Player';
 import { SurvivalMode, type SurvivalAudio } from '../modes/SurvivalMode';
-import { PlayerInput } from '../input/PlayerInput';
+import { PlayerInput, idleInput } from '../input/PlayerInput';
 import { AirdropSystem } from '../systems/AirdropSystem';
 import { AtmosphereSystem } from '../systems/AtmosphereSystem';
 import { BulletSystem } from '../systems/BulletSystem';
@@ -174,6 +174,7 @@ export class GameScene extends Phaser.Scene {
       cameraRig: this.cameraRig,
       noise: this.noise,
       scrap: this.scrap,
+      barricades: this.barricades,
       bus: this.bus,
       groundY: level.playLine,
       onPlayerDied: (now) => (this.diedAt = now),
@@ -206,6 +207,13 @@ export class GameScene extends Phaser.Scene {
           groundY: level.playLine,
           refugeX: level.spawnX,
           startWave: options.startWave,
+          startAtBoss: options.bossOnly,
+          worldWidth: level.width,
+          barricades: this.barricades,
+          atmosphere: this.atmosphere,
+          hurtPlayer: (damage, fromX, now, shove) => this.combat.hurtPlayer(damage, fromX, now, shove),
+          connectBoss: (fight) => fight.connect(this.gunfire, this.combat, this.throwables),
+          openEpilogue: (done) => this.openOverlay(SCENE.epilogue, { kills: this.director.kills, timeMs: this.survival?.waves.elapsedMs ?? 0, done }),
         })
       : null;
 
@@ -272,13 +280,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   override update(time: number, delta: number): void {
-    const input = this.controls.read();
+    const read = this.controls.read();
+    // En la presentación y el final del jefe Alex no se controla: solo mira hacia donde toca.
+    const cinema = this.survival?.cinema;
+    const input = cinema?.cinematic ? idleInput() : read;
+    const look = cinema?.cinematic ? (cinema.lookAt ?? this.player.facing) : null;
+    const aim = look ? { x: this.player.x + look * 80, y: this.player.centerY - 4 } : this.controls.aimPoint();
 
     if (this.diedAt !== null) {
-      this.player.update(time, delta, input, this.controls.aimPoint());
+      this.player.update(time, delta, input, aim);
       if (time - this.diedAt > RETRY_DELAY_MS && input.confirmPressed) this.scene.restart();
     } else {
-      const shot = this.player.update(time, delta, input, this.controls.aimPoint());
+      const shot = this.player.update(time, delta, input, aim);
       if (shot) this.gunfire.fire(shot, time);
       if (input.throwPressed && this.player.tryThrow(input.throwPressed, time)) {
         this.throwables.launch(input.throwPressed, this.player.throwOrigin, this.controls.aimPoint(), this.player.facing, time);
@@ -287,26 +300,14 @@ export class GameScene extends Phaser.Scene {
       if (this.player.landed) this.fx.dustPuff(this.player.x, this.level.playLine);
 
       this.noise.update(time, delta, this.player.x, this.player.movementNoise, this.player.sneaking);
-      this.director.update(
-        time,
-        { x: this.player.x, centerY: this.player.centerY, alive: this.player.alive },
-        {
-          strike: (zombie) => this.combat.strike(zombie, time),
-          swing: (zombie) => this.combat.swing(zombie),
-          smash: (zombie, barricade) => {
-            // Solo el mazazo del mutante sacude la pantalla: en la horda golpean decenas a la vez.
-            this.cameraRig.addTrauma(zombie.def.id === 'mutant' ? 0.35 : 0.03);
-            this.noise.emit(barricade.x, zombie.def.voice, 'creature', time, false);
-            this.barricades.hit(barricade, time);
-          },
-        },
-      );
+      const target = { x: this.player.x, centerY: this.player.centerY, alive: this.player.alive };
+      this.director.update(time, target, this.combat.directorEvents(time));
       this.pickups.update(this.player);
       this.scrap.update(time, delta, this.player);
       this.airdrop.update(time, delta, input.interactHeld);
       if (this.survival) {
         this.survivalAudio = this.survival.update(time, delta);
-        if (this.survival.state.finished && input.reloadPressed) this.scene.restart();
+        if (this.survival.state.finished && read.reloadPressed) this.scene.restart();
       }
       this.updateZone();
     }
@@ -322,7 +323,7 @@ export class GameScene extends Phaser.Scene {
     const body = this.player.sprite.body as Phaser.Physics.Arcade.Body;
     this.player.postUpdate(time, this.level.playLine);
     this.director.syncShadows();
-    this.cameraRig.update(this.player.x, this.player.facing, body.velocity.x, delta, time);
+    this.cameraRig.update(this.survival?.cinema?.focus ?? this.player.x, this.player.facing, body.velocity.x, delta, time);
     this.backdrop.sync(this.cameras.main.scrollX, time, delta);
     this.dayNight.update(delta, time, this.player.x, this.player.sprite.y);
     this.gunfire.update(time);

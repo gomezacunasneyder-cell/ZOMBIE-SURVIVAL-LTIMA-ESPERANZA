@@ -93,7 +93,9 @@ Las teclas se definen en un mapa de acciones reasignable, no directamente en el 
 
 **Sistema de ruido.** Toda acción ruidosa emite un evento con posición y radio (pasos, carrera, disparos, impactos de bala, explosiones, gruñidos de otras criaturas). Caminar en silencio (S o Ctrl) y estar quieto no hacen ruido. Cada enemigo dentro del radio, según su oído, pasa a investigar ese punto. El HUD muestra el ruido que genera el jugador.
 
-**EL DEVORADOR (propuesta de fases)**
+**EL DEVORADOR** (hecho en la Fase 6; detalle en [decisiones/0009](decisiones/0009-fase-6-devorador.md)). Mutante de casi cuatro metros, el Sujeto 7 del Proyecto Origen. Ataques: golpe contra el suelo con onda expansiva (se salta), embestida con zarpazo, bilis en parábola que deja charcos, invocación de infectados pequeños y derribo de barricadas. Fases: normal; al 50 % se enfurece (cambia de aspecto, más rápido y fuerte); al 25 %, erupción de espinas avisadas por grietas, tras la que queda agotado y recibe el doble de daño. Al morir: victoria, grabación militar que revela el origen del Z-13 y un chasquido detrás de Alex.
+
+**Propuesta original de fases**
 
 1. **Contención rota:** embestidas y golpes de área; puntos débiles visibles.
 2. **Llamada:** convoca oleadas de caminantes y lanza escombros; el escenario pierde luz.

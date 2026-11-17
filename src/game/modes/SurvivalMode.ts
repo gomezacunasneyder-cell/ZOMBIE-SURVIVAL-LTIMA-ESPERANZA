@@ -14,7 +14,11 @@ import type { NoiseSystem } from '../systems/NoiseSystem';
 import { WaveSystem } from '../systems/WaveSystem';
 import type { ZombieDirector } from '../systems/ZombieDirector';
 import type { BuiltLevel } from '../world/LevelBuilder';
-import { BossIntro } from './BossIntro';
+import { WAVE_TIMING } from '../../content/waves';
+import type { AtmosphereSystem } from '../systems/AtmosphereSystem';
+import type { BarricadeSystem } from '../systems/BarricadeSystem';
+import { BossCinema, type CinemaStage } from './BossCinema';
+import { BossFight } from './BossFight';
 
 export interface SurvivalDeps {
   director: ZombieDirector;
@@ -31,6 +35,16 @@ export interface SurvivalDeps {
   groundY: number;
   refugeX: number;
   startWave: number;
+  /** `?modo=jefe`: empieza directamente por EL DEVORADOR. */
+  startAtBoss: boolean;
+  worldWidth: number;
+  barricades: BarricadeSystem;
+  atmosphere: AtmosphereSystem;
+  hurtPlayer: (damage: number, fromX: number, now: number, shove: number) => void;
+  /** Conecta las armas de Alex con el jefe. */
+  connectBoss: (fight: BossFight) => void;
+  /** Abre la grabación militar; llama a `done` al cerrarla. */
+  openEpilogue: (done: () => void) => void;
 }
 
 /** Lo que la escena pasa al director de audio. */
@@ -53,11 +67,14 @@ const ALARM_NOISE_RADIUS = 900;
 export class SurvivalMode {
   readonly waves: WaveSystem;
   private horde: 'off' | 'alarm' | 'fighting' = 'off';
-  private boss: BossIntro | null = null;
+  /** Combate contra EL DEVORADOR y su presentación y final, o `null`. */
+  fight: BossFight | null = null;
+  cinema: BossCinema | null = null;
   private finished = false;
   private alert = 0;
   private danger = 0;
   private shownDanger = -1;
+  private shownDim = -1;
   private nextAlarmNoiseAt = 0;
   private nextRumbleAt = 0;
   private readonly warned = new Set<string>();
@@ -82,15 +99,64 @@ export class SurvivalMode {
   }
 
   begin(): void {
-    this.waves.begin();
+    if (this.deps.startAtBoss) this.waves.skipToBoss();
+    else this.waves.begin();
   }
 
+  /** El jefe ya ha salido del humo (pruebas). */
   get bossRevealed(): boolean {
-    return this.boss?.revealed ?? false;
+    const stage = this.cinema?.stage;
+    return stage !== undefined && (stage !== 'intro' || (this.fight?.devourer.sprite.alpha ?? 0) >= 1);
+  }
+
+  /** Presentación o final: Alex no se controla. */
+  get cinematic(): boolean {
+    return this.cinema?.cinematic ?? false;
+  }
+
+  get cinemaStage(): CinemaStage | null {
+    return this.cinema?.stage ?? null;
   }
 
   get state(): { horde: string; alert: number; danger: number; finished: boolean; boss: boolean } {
-    return { horde: this.horde, alert: this.alert, danger: this.danger, finished: this.finished, boss: this.boss !== null };
+    return { horde: this.horde, alert: this.alert, danger: this.danger, finished: this.finished, boss: this.fight !== null };
+  }
+
+  /** Aparece EL DEVORADOR por el lado contrario a Alex. */
+  private startBoss(now: number): void {
+    const { deps } = this;
+    const entryX = deps.player.x <= deps.refugeX ? deps.refugeX + 280 : deps.refugeX - 280;
+    this.fight = new BossFight(this.scene, {
+      bus: deps.bus,
+      director: deps.director,
+      player: deps.player,
+      airdrop: deps.airdrop,
+      barricades: deps.barricades,
+      lighting: deps.lighting,
+      fx: deps.fx,
+      cameraRig: deps.cameraRig,
+      noise: deps.noise,
+      rng: deps.rng,
+      groundY: deps.groundY,
+      worldWidth: deps.worldWidth,
+      refugeX: deps.refugeX,
+      hurtPlayer: deps.hurtPlayer,
+    }, entryX);
+    deps.connectBoss(this.fight);
+    const cinema = new BossCinema(this.scene, {
+      bus: deps.bus,
+      director: deps.director,
+      player: deps.player,
+      fx: deps.fx,
+      cameraRig: deps.cameraRig,
+      atmosphere: deps.atmosphere,
+      groundY: deps.groundY,
+      refugeX: deps.refugeX,
+      introMs: WAVE_TIMING.bossMs,
+    }, this.fight, entryX, now);
+    cinema.onEpilogue = () => deps.openEpilogue(() => cinema.epilogueDone());
+    cinema.onFinished = () => this.waves.defeatBoss();
+    this.cinema = cinema;
   }
 
   private onWaveEvent(event: WaveEvent<EnemyKind>): void {
@@ -117,11 +183,16 @@ export class SurvivalMode {
       case 'boss':
         this.horde = 'off';
         for (const alarm of this.deps.built.alarms) alarm.armed = false;
-        this.boss = new BossIntro(this.scene, this.deps.bus, this.deps.lighting, this.deps.fx, this.deps.cameraRig, this.deps.groundY, now);
+        this.startBoss(now);
         break;
       case 'done':
         this.finished = true;
-        this.deps.bus.emit('survivalEnd', { waves: this.waves.run.waves.length, kills: this.deps.director.kills, timeMs: this.waves.elapsedMs });
+        this.deps.bus.emit('survivalEnd', {
+          waves: this.waves.run.waves.length,
+          kills: this.deps.director.kills,
+          timeMs: this.waves.elapsedMs,
+          victory: true,
+        });
         break;
       default:
         break;
@@ -130,15 +201,22 @@ export class SurvivalMode {
 
   update(now: number, deltaMs: number): SurvivalAudio {
     this.waves.update(now);
-    this.watchBarricades();
+    // Contra el jefe, sus propios avisos sustituyen a los de las oleadas.
+    if (!this.fight) this.watchBarricades();
     let hush = 0;
     let blackout = 0;
-    if (this.boss) {
-      const ambience = this.boss.update(now);
+    if (this.cinema && this.fight) {
+      this.fight.update(now, deltaMs);
+      const ambience = this.cinema.update(now);
       hush = ambience.hush;
       blackout = ambience.blackout;
-      this.alert = Math.max(0, this.alert - deltaMs / 1500);
-      this.danger = 0;
+      this.alert = ambience.alert;
+      this.danger = ambience.danger;
+      const dim = Math.round(ambience.dim * 20) / 20;
+      if (dim !== this.shownDim) {
+        this.shownDim = dim;
+        this.deps.bus.emit('dim', { level: dim });
+      }
     } else if (this.horde !== 'off') {
       this.updateHorde(now, deltaMs);
     } else {
@@ -151,7 +229,7 @@ export class SurvivalMode {
       this.shownDanger = shown;
       this.deps.bus.emit('danger', { level: shown });
     }
-    return { danger: this.horde === 'off' ? this.danger * 0.6 : 1, hush };
+    return { danger: this.fight ? this.danger : this.horde === 'off' ? this.danger * 0.6 : 1, hush };
   }
 
   /** Alarma y horda: luz roja que late con la sirena, temblores y estruendo. */

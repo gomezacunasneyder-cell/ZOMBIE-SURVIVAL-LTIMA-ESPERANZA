@@ -33,6 +33,7 @@ import {
   synthRadioAlarm,
   synthRadioChatter,
 } from '../../audio/synth/supplies';
+import { synthBileSplat, synthBossDeath, synthBossGrowl, synthBossHurt, synthBossRoar, synthBossSlam, synthBossSpit, synthSpike, synthTape } from '../../audio/synth/boss';
 import { synthGlassBreak, synthGrenadeBounce, synthScrapPickup, synthThrowSwish } from '../../audio/synth/throwables';
 import { positional } from '../../core/settings/audioSettings';
 import { audioState } from '../audio/audioState';
@@ -73,6 +74,15 @@ export const SFX = {
   grenadeBounce: 'sfx/grenade-bounce',
   glassBreak: 'sfx/glass-break',
   scrap: 'sfx/scrap',
+  bossRoar: 'sfx/boss-roar',
+  bossGrowl: 'sfx/boss-growl',
+  bossHurt: 'sfx/boss-hurt',
+  bossDeath: 'sfx/boss-death',
+  bossSlam: 'sfx/boss-slam',
+  bossSpit: 'sfx/boss-spit',
+  bileSplat: 'sfx/bile-splat',
+  spike: 'sfx/spike',
+  tape: 'sfx/tape',
 } as const;
 
 /** Disparo propio de cada arma: `sfx/shot/<id>`. */
@@ -137,6 +147,15 @@ const RECIPES: Record<SfxKey | LoopKey, Recipe> = {
   [SFX.grenadeBounce]: synthGrenadeBounce,
   [SFX.glassBreak]: synthGlassBreak,
   [SFX.scrap]: synthScrapPickup,
+  [SFX.bossRoar]: synthBossRoar,
+  [SFX.bossGrowl]: synthBossGrowl,
+  [SFX.bossHurt]: synthBossHurt,
+  [SFX.bossDeath]: synthBossDeath,
+  [SFX.bossSlam]: synthBossSlam,
+  [SFX.bossSpit]: synthBossSpit,
+  [SFX.bileSplat]: synthBileSplat,
+  [SFX.spike]: synthSpike,
+  [SFX.tape]: synthTape,
   [LOOP.wind]: synthWindLoop,
   [LOOP.helicopter]: synthHelicopterLoop,
   [LOOP.alarm]: synthAlarmLoop,

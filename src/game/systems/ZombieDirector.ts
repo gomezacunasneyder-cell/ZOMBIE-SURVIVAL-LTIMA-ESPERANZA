@@ -225,6 +225,7 @@ export class ZombieDirector {
       this.react(zombie, before, result, now, events);
     }
 
+    this.dropFled();
     if (this.trickle && target.alive && now >= this.nextTrickleAt) {
       this.nextTrickleAt = now + TRICKLE_MS;
       if (this.aliveCount < TRICKLE_LIMIT) this.spawnOffscreen();
@@ -300,6 +301,26 @@ export class ZombieDirector {
       if (roll <= 0) return kind;
     }
     return 'walker';
+  }
+
+  /**
+   * Todos huyen, alejándose de `fromX` (llega EL DEVORADOR). Los que salen
+   * de la pantalla vuelven al depósito sin contar como bajas.
+   */
+  scatter(fromX: number): void {
+    for (const zombie of this.zombies) {
+      if (zombie.alive) zombie.fleeing = zombie.x < fromX ? -1 : 1;
+    }
+  }
+
+  /** Retira a los que huían y ya no se ven. */
+  private dropFled(): void {
+    const camera = this.scene.cameras.main;
+    for (const zombie of [...this.zombies]) {
+      if (!zombie.alive || zombie.fleeing === 0) continue;
+      const out = zombie.x < camera.scrollX - 40 || zombie.x > camera.scrollX + GAME_WIDTH + 40 || zombie.x <= 12 || zombie.x >= this.worldWidth - 12;
+      if (out) zombie.stash();
+    }
   }
 
   syncShadows(): void {

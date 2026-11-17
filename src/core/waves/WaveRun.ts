@@ -40,7 +40,7 @@ export interface WaveTiming {
   introMs: number;
   /** Duración de la alarma que despierta a la horda. */
   alarmMs: number;
-  /** Secuencia de aparición del jefe. */
+  /** Presentación del jefe, antes de que empiece el combate. */
   bossMs: number;
 }
 
@@ -137,9 +137,7 @@ export class WaveRun<Kind extends string = string> {
           ? this.timing.introMs
           : this.phase === 'alarm'
             ? this.timing.alarmMs
-            : this.phase === 'boss'
-              ? this.timing.bossMs
-              : 0;
+            : 0;
     return Math.max(0, length - (now - this.phaseStartedAt));
   }
 
@@ -176,10 +174,7 @@ export class WaveRun<Kind extends string = string> {
         }
         break;
       case 'boss':
-        if (elapsed >= this.timing.bossMs) {
-          this.enter('done', now);
-          events.push({ type: 'done' });
-        }
+        // El combate contra el jefe termina cuando la escena avisa de que ha caído.
         break;
       case 'done':
         break;
@@ -224,6 +219,23 @@ export class WaveRun<Kind extends string = string> {
   private flipSide(): -1 | 1 {
     this.nextSide = this.nextSide === 1 ? -1 : 1;
     return this.nextSide;
+  }
+
+  /** El jefe ha caído: fin de la partida. */
+  defeatBoss(now: number): WaveEvent<Kind>[] {
+    if (this.phase !== 'boss') return [];
+    this.enter('done', now);
+    return [{ type: 'done' }];
+  }
+
+  /** Salta directamente al jefe (`?modo=jefe` y pruebas). */
+  skipToBoss(now: number): WaveEvent<Kind>[] {
+    this.index = this.waves.length - 1;
+    this.queue = [];
+    this.spawned = 0;
+    this.killed = 0;
+    this.enter('boss', now);
+    return [{ type: 'boss' }];
   }
 
   /** Salta a una oleada (pruebas): empieza su aviso. */

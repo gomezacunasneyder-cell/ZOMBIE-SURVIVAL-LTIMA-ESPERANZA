@@ -4,8 +4,7 @@ import { Rng } from '../../core/math/Rng';
 
 /**
  * Arte del modo supervivencia: la barricada reforzada que hay que
- * defender, sus estados de deterioro y la silueta de EL DEVORADOR que
- * asoma tras el muro al terminar la horda.
+ * defender y sus estados de deterioro. EL DEVORADOR está en `devourer.ts`.
  */
 
 export const FORTIFICATION_STAGES = 3;
@@ -53,76 +52,4 @@ export function paintFortification(stage = 0): PixelBuffer {
     buf.dither(4, 18, 22, 5, P.brown1, 0.3);
   }
   return buf.outline(P.outline);
-}
-
-export const DEVOURER_WIDTH = 150;
-export const DEVOURER_HEIGHT = 112;
-
-/**
- * Silueta de EL DEVORADOR: una mole encorvada del tamaño de un edificio,
- * con espinas de hueso, brazos que acaban en garras, fauces abiertas y
- * ojos que brillan. Casi negra: solo se adivina contra el cielo.
- * `eyesOpen` controla el brillo de los ojos (parpadeo de la aparición).
- */
-export function paintDevourer(eyesOpen: boolean): PixelBuffer {
-  const buf = new PixelBuffer(DEVOURER_WIDTH, DEVOURER_HEIGHT);
-  const body = P.outline;
-  const rim = P.shadow;
-  // Joroba y tronco.
-  buf.ellipse(78, 74, 52, 40, body);
-  buf.ellipse(64, 56, 38, 30, body);
-  // Cabeza adelantada y baja.
-  buf.ellipse(38, 52, 20, 16, body);
-  // Mandíbula colgante.
-  buf.trapezoid(58, 22, 54, 72, 28, 50, body);
-  // Brazos larguísimos apoyados en el suelo.
-  buf.line(46, 64, 20, 104, body, 7);
-  buf.line(104, 70, 128, 106, body, 8);
-  for (const [x, y, dir] of [
-    [16, 106, -1],
-    [130, 108, 1],
-  ] as const) {
-    for (let i = 0; i < 3; i++) buf.line(x + i * 4 * dir, y, x + i * 4 * dir + dir * 5, y + 4, P.grey3, 1);
-  }
-  // Espinas de hueso en el lomo.
-  const spines: [number, number, number][] = [
-    [56, 28, 12],
-    [68, 24, 16],
-    [82, 30, 14],
-    [96, 38, 12],
-    [108, 48, 10],
-  ];
-  for (const [x, y, h] of spines) {
-    buf.line(x, y + h, x + 3, y, P.grey3, 2);
-    buf.set(x + 3, y, P.grey2);
-  }
-  // Contorno iluminado por la ciudad: dos píxeles en el lomo para recortarse contra el cielo.
-  for (let x = 0; x < DEVOURER_WIDTH; x++) {
-    for (let y = 1; y < DEVOURER_HEIGHT; y++) {
-      if (buf.get(x, y) !== body || buf.get(x, y - 1) !== 0) continue;
-      buf.set(x, y, P.grey3);
-      if (buf.get(x, y + 1) === body) buf.set(x, y + 1, rim);
-    }
-  }
-  // Fauces: dientes y garganta encendida.
-  buf.trapezoid(62, 26, 50, 70, 30, 46, P.blood3);
-  for (let x = 28; x < 50; x += 3) {
-    buf.vline(x, 61, 3, P.white);
-    buf.vline(x + 1, 67, 3, P.grey1);
-  }
-  buf.ellipse(38, 66, 5, 2, P.blood2);
-  // Ojos: varios, en racimo, como heridas que brillan.
-  const eyes: [number, number][] = [
-    [30, 46],
-    [38, 44],
-    [46, 47],
-    [35, 50],
-  ];
-  for (const [x, y] of eyes) {
-    if (eyesOpen) {
-      buf.rect(x, y, 3, 2, P.blood1);
-      buf.set(x + 1, y, P.org1);
-    } else buf.hline(x, y + 1, 3, P.blood3);
-  }
-  return buf;
 }

@@ -104,20 +104,29 @@ test.describe('modo supervivencia', () => {
     expect(hit.player.x).toBeLessThan(790);
   });
 
-  test('al terminar la horda llega el jefe y la pantalla final; R vuelve a empezar', async ({ page }) => {
-    test.setTimeout(150_000);
+  test('al terminar la horda llega EL DEVORADOR; al vencerlo, la pantalla final; R vuelve a empezar', async ({ page }) => {
+    test.setTimeout(180_000);
     await openGame(page, '?modo=oleadas&semilla=2&oleada=5&hora=noche');
     await until(page, (s) => s.survival!.phase === 'fighting', 15_000);
     await autoKill(page, true);
     const boss = await until(page, (s) => s.survival!.phase === 'boss', 90_000);
     await autoKill(page, false);
     expect(boss.survival).toMatchObject({ kills: 154, remaining: 0, boss: true });
-    // La música se apaga, las farolas también y aparece la silueta.
+    // La música se apaga y aparece el jefe con su nombre.
     await until(page, (s) => (s.audio.loops['loop/combat'] ?? 1) < 0.2, 8000);
     await until(page, (s) => s.survival!.bossRevealed, 15_000);
     await page.waitForFunction(() => window.__ZS__!.hudTexts!().some((t) => t.text === 'EL DEVORADOR'), null, { timeout: 5000 });
-    await until(page, (s) => s.survival!.finished, 10_000);
-    expect(await hudTexts(page)).toEqual(expect.arrayContaining(['HAS SOBREVIVIDO', 'PULSA R PARA JUGAR DE NUEVO']));
+    // La partida no termina hasta vencerlo.
+    await until(page, (s) => s.survival!.fight?.stage === 'fight' && s.survival!.fight!.state !== 'emerging', 15_000);
+    expect((await state(page)).survival!.finished).toBe(false);
+    await page.evaluate(() => window.__ZS__!.sim!.damageBoss(1e6));
+    await page.waitForFunction(() => window.__ZS__!.epilogue === 'recording', null, { timeout: 25_000 });
+    for (let i = 0; i < 40 && (await page.evaluate(() => window.__ZS__!.epilogue)) !== null; i++) {
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(100);
+    }
+    await until(page, (s) => s.survival!.finished, 15_000);
+    expect(await hudTexts(page)).toEqual(expect.arrayContaining(['CONTINUARA...', 'PULSA R PARA JUGAR DE NUEVO']));
     await page.keyboard.press('r');
     await page.waitForFunction(() => {
       const s = window.__ZS__?.sim?.state();

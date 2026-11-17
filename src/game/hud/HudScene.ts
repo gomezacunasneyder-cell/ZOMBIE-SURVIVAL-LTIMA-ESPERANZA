@@ -6,6 +6,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { updateTestHook, type TextBounds } from '../debug/testHook';
 import { BUS_KEY, SCENE } from '../scenes/keys';
 import { AirdropHud } from './AirdropHud';
+import { BossBar } from './BossBar';
 import { NoiseMeter } from './NoiseMeter';
 import { PackHud } from './PackHud';
 import { WaveHud } from './WaveHud';
@@ -32,6 +33,7 @@ export class HudScene extends Phaser.Scene {
   private healthText!: Phaser.GameObjects.BitmapText;
   private phaseText!: Phaser.GameObjects.BitmapText;
   private noiseMeter!: NoiseMeter;
+  private veil!: Phaser.GameObjects.Rectangle;
   private barTop!: Phaser.GameObjects.Rectangle;
   private barBottom!: Phaser.GameObjects.Rectangle;
   private panel!: WeaponPanel;
@@ -43,6 +45,7 @@ export class HudScene extends Phaser.Scene {
   private medkitIcon!: Phaser.GameObjects.Image;
   private airdropHud!: AirdropHud;
   private packHud!: PackHud;
+  private bossBar!: BossBar;
   private waveHud!: WaveHud;
   private killsText!: Phaser.GameObjects.BitmapText;
   private skull!: Phaser.GameObjects.Image;
@@ -66,6 +69,8 @@ export class HudScene extends Phaser.Scene {
     this.healProgress = null;
     this.dead = false;
 
+    // Velo para oscurecer la escena (presentación y final del jefe), bajo el resto del HUD.
+    this.veil = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, colorNumber('outline')).setOrigin(0, 0).setAlpha(0);
     this.buildLetterbox();
     this.buildHealth();
     this.noiseMeter = new NoiseMeter(this, MARGIN, MARGIN + 22, (x, y, content) => this.text(x, y, content));
@@ -75,6 +80,7 @@ export class HudScene extends Phaser.Scene {
     this.buildMessages();
     this.airdropHud = new AirdropHud(this, (x, y, content, scale) => this.text(x, y, content, scale));
     this.waveHud = new WaveHud(this, (x, y, content, scale) => this.text(x, y, content, scale));
+    this.bossBar = new BossBar(this, (x, y, content, scale) => this.text(x, y, content, scale));
     this.buildCrosshair();
 
     const bus = this.registry.get(BUS_KEY) as EventBus<GameEvents>;
@@ -103,6 +109,9 @@ export class HudScene extends Phaser.Scene {
       bus.on('wave', (e) => this.waveHud.onWave(e)),
       bus.on('announce', (e) => this.waveHud.onAnnounce(e)),
       bus.on('danger', (e) => this.waveHud.onDanger(e.level)),
+      bus.on('boss', (e) => this.bossBar.show(e)),
+      bus.on('cinematic', (e) => this.cinematic(e.on)),
+      bus.on('dim', (e) => this.veil.setAlpha(e.level)),
       bus.on('survivalEnd', (e) => {
         this.dead = true;
         this.input.setDefaultCursor('default');
@@ -120,6 +129,7 @@ export class HudScene extends Phaser.Scene {
     this.panel.update(time);
     this.airdropHud.update(time);
     this.packHud.update(time);
+    this.bossBar.update(time);
     this.waveHud.update(time);
     this.updateCrosshair();
   }
@@ -249,6 +259,19 @@ export class HudScene extends Phaser.Scene {
     const slide = { duration: 420, ease: 'Sine.easeInOut', yoyo: true, hold: 1800 };
     this.tweens.add({ targets: this.barTop, y: 0, ...slide });
     this.tweens.add({ targets: this.barBottom, y: GAME_HEIGHT - LETTERBOX, ...slide });
+  }
+
+  /** Franjas de cine que entran y se quedan durante el final. */
+  private cinematic(on: boolean): void {
+    this.tweens.killTweensOf([this.barTop, this.barBottom]);
+    const tall = LETTERBOX * 2;
+    if (on) {
+      this.barTop.setSize(GAME_WIDTH, tall).setY(-tall);
+      this.barBottom.setSize(GAME_WIDTH, tall).setY(GAME_HEIGHT);
+    }
+    const ease = { duration: 600, ease: 'Sine.easeInOut' };
+    this.tweens.add({ targets: this.barTop, y: on ? 0 : -tall, ...ease });
+    this.tweens.add({ targets: this.barBottom, y: on ? GAME_HEIGHT - tall : GAME_HEIGHT, ...ease });
   }
 
   private showGameOver(kills: number): void {

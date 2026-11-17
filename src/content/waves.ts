@@ -122,7 +122,7 @@ export const SURVIVAL_WAVES: readonly SurvivalWave[] = [
 export const WAVE_TIMING: WaveTiming = {
   introMs: 3500,
   alarmMs: 7000,
-  bossMs: 14_000,
+  bossMs: 11_000,
 };
 
 /** En el modo supervivencia todos derriban las barricadas en vez de saltarlas: cada cuánto golpean. */

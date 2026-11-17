@@ -9,6 +9,7 @@ export const SCENE = {
   bestiary: 'Bestiary',
   options: 'Options',
   inventory: 'Inventory',
+  epilogue: 'Epilogue',
 } as const;
 
 /** Clave del registro donde la escena de juego publica su bus de eventos. */

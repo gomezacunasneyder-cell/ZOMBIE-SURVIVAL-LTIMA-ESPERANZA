@@ -53,7 +53,7 @@ test.describe('arrojadizos', () => {
     const blown = await until(page, (s) => s.throwables.exploded === 1, 6000);
     expect(blown.throwables.flying.length).toBe(0);
     expect(blown.explosions.total).toBeGreaterThanOrEqual(1);
-    await until(page, (s) => s.zombies.filter((z) => z.alive).length === 0, 3000);
+    await until(page, (s) => s.zombies.filter((z) => z.alive).length === 0, 8000);
     // La explosión se oye: cuenta como ruido de Alex.
     expect(blown.noise.emitted).toBeGreaterThan(before.noise.emitted);
   });

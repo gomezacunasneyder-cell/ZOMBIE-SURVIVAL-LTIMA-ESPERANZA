@@ -141,5 +141,22 @@ function survivalState(mode: SurvivalMode, now: number): NonNullable<SimState['s
     timeLeft: run.timeLeft(now),
     ...mode.state,
     bossRevealed: mode.bossRevealed,
+    fight: mode.fight && mode.cinema
+      ? {
+          stage: mode.cinema.stage,
+          state: mode.fight.brain?.state ?? 'intro',
+          step: mode.fight.brain?.step ?? '',
+          phase: mode.fight.phase,
+          health: mode.fight.brain?.health ?? mode.fight.brainMaxHealth,
+          max: mode.fight.brainMaxHealth,
+          x: mode.fight.devourer.x,
+          facing: mode.fight.brain?.facing ?? -1,
+          taken: mode.fight.taken,
+          minions: mode.fight.minionsAlive,
+          hazards: mode.fight.hazards.counts,
+          cinematic: mode.cinematic,
+          animation: mode.fight.devourer.sprite.anims.currentAnim?.key ?? String(mode.fight.devourer.sprite.frame.name),
+        }
+      : null,
   };
 }

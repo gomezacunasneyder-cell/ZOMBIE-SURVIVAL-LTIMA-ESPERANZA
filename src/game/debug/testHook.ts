@@ -30,6 +30,10 @@ export interface SimHook {
   dropScrap(x: number, amount: number): void;
   /** Modo supervivencia: salta a la oleada `wave` (1…5). */
   skipToWave(wave: number): void;
+  /** Devuelve a Alex la vida entera (capturas). */
+  healPlayer(): void;
+  /** Hace daño a EL DEVORADOR (como un disparo). Devuelve el que le ha hecho. */
+  damageBoss(amount: number): number;
   /** Mata a todos los enemigos en pie (cuentan como bajas). */
   killAll(): void;
   /** Prueba de rendimiento: hace aparecer `count` enemigos alrededor de Alex. */
@@ -61,6 +65,8 @@ export interface TestHook {
   frameSignature?: (name: string) => string;
   /** La pausa con ajustes de sonido está abierta. */
   optionsOpen?: boolean;
+  /** Fase de la grabación militar del final (`victory`, `recording`, `end`), o `null`. */
+  epilogue?: string | null;
   /** El inventario (Tab) está abierto. */
   inventoryOpen?: boolean;
 }
@@ -92,6 +98,8 @@ export interface LaunchOptions {
   mode: 'campaign' | 'survival';
   /** `&oleada=N`: oleada con la que empieza el modo supervivencia (0 = la primera). */
   startWave: number;
+  /** `?modo=jefe`: el refugio, directamente contra EL DEVORADOR. */
+  bossOnly: boolean;
 }
 
 /** `atardecer`, `noche` o un número de 0 a 1. */
@@ -117,10 +125,12 @@ export function readLaunchOptions(search: string): LaunchOptions {
     test: params.get('test') === '1',
     skin: parseSkinId(params.get('skin')),
     night: parseHour(params.get('hora')),
-    loadout: params.get('arsenal') === 'completo' ? 'completo' : params.get('arsenal') === 'basico' ? 'basico' : 'inicial',
+    // Contra el jefe directamente se llevan las cuatro armas básicas (como tras unas oleadas).
+    loadout: params.get('arsenal') === 'completo' ? 'completo' : params.get('arsenal') === 'basico' || (params.get('modo') === 'jefe' && !params.get('arsenal')) ? 'basico' : 'inicial',
     seed: Number.isFinite(Number(params.get('semilla'))) && params.get('semilla') !== null ? Number(params.get('semilla')) : null,
     airdropNow: params.get('suministros') === 'ya',
-    mode: params.get('modo') === 'oleadas' ? 'survival' : 'campaign',
+    mode: params.get('modo') === 'oleadas' || params.get('modo') === 'jefe' ? 'survival' : 'campaign',
+    bossOnly: params.get('modo') === 'jefe',
     startWave: Math.max(0, Math.floor(Number(params.get('oleada') ?? 1) || 1) - 1),
   };
 }

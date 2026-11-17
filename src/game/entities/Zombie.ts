@@ -58,6 +58,8 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
   private shownState: EnemyState | 'idle' | null = null;
   private flashUntil = 0;
   private faced: 1 | -1 = -1;
+  /** Huye hacia un lado (llega EL DEVORADOR); 0 = no huye. */
+  fleeing: -1 | 0 | 1 = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -111,6 +113,18 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
   step(now: number, target: ZombieTarget, senses: ZombieSenses): StepResult {
     if (!this.alive) return NOTHING;
     const body = this.arcadeBody;
+    if (this.fleeing !== 0) {
+      // Despavorido: corre hacia el borde sin hacer caso a nada.
+      body.setVelocityX(this.fleeing * this.def.chaseSpeed * 1.8);
+      // Salta lo que le corte el paso (bidones, coches).
+      const stuck = this.fleeing < 0 ? body.blocked.left : body.blocked.right;
+      if (stuck && body.blocked.down) body.setVelocityY(-Math.max(this.def.hopSpeed, 220));
+      this.setFlipX(this.fleeing === -1);
+      this.anims.play(this.anim('walk'), true);
+      this.anims.timeScale = 1.5;
+      this.shownState = null;
+      return NOTHING;
+    }
     const dx = target.x - this.x;
     const dy = target.centerY - body.center.y;
 
@@ -274,6 +288,7 @@ export class Zombie extends Phaser.Physics.Arcade.Sprite {
     this.shownState = null;
     this.flashUntil = 0;
     this.faced = -1;
+    this.fleeing = 0;
     this.corpseMs = CORPSE_MS;
     this.setActive(true).setVisible(true).setAlpha(1).clearTint().setFlipX(false);
     this.setDepth(DEPTH.zombie + random() * 0.4);

@@ -53,6 +53,12 @@ export function installGameHooks(src: GameHookSources): void {
     giveThrowable: (id, count) => void player.addThrowable(id, count),
     dropScrap: (x, amount) => src.scrap.drop(x, amount, src.now()),
     skipToWave: (wave) => src.survival?.waves.skipTo(wave - 1),
+    healPlayer: () => {
+      if (!player.alive) return;
+      player.health.heal(player.health.max);
+      player.announce();
+    },
+    damageBoss: (amount) => src.survival?.fight?.damage(amount, src.now(), 'bullet') ?? 0,
     killAll: () => {
       for (const zombie of [...director.zombies]) if (zombie.alive) src.kill(zombie);
     },

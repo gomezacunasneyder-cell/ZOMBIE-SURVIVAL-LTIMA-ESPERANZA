@@ -285,6 +285,14 @@ await shot('fase4-jefe-1-silueta');
 await untilState(String((s) => s.survival.bossRevealed));
 await waitGame(900);
 await shot('fase4-jefe-2-devorador');
+// El combate contra el jefe se resuelve aquí de golpe (sus capturas están en capturar-jefe.mjs).
+await untilState(String((s) => s.survival.fight && s.survival.fight.stage === 'fight' && s.survival.fight.state !== 'emerging'));
+await page.evaluate(() => window.__ZS__.sim.damageBoss(1e6));
+await page.waitForFunction(() => window.__ZS__.epilogue === 'recording', null, { timeout: 30000 });
+while ((await page.evaluate(() => window.__ZS__.epilogue)) !== null) {
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(120);
+}
 await untilState(String((s) => s.survival.finished));
 await waitGame(400);
 await shot('fase4-oleadas-fin');

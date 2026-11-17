@@ -105,6 +105,7 @@ import { addEnemyAnimations } from './enemyArt';
 import { addSupplyArt } from './supplyArt';
 import { addSurvivalArt } from './survivalArt';
 import { addThrowArt } from './throwArt';
+import { addDevourerArt } from './devourerArt';
 import { P } from './palette';
 import { PixelBuffer } from './PixelBuffer';
 import type { HumanoidFrame } from './rig/humanoid';
@@ -259,6 +260,7 @@ export function buildArtCatalog(): ArtCatalog {
   // Fase 4: modo supervivencia.
   addSurvivalArt(sprites);
   addThrowArt(sprites);
+  addDevourerArt(sprites, (key, frames, rate, repeat) => addAnimation(key, frames, rate, repeat));
 
   // Objetos.
   sprites.set('prop/barrel', paintBarrel());

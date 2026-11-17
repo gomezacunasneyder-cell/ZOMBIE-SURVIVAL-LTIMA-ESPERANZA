@@ -72,6 +72,17 @@ export class WaveSystem {
     }
   }
 
+  /** El jefe ha caído. */
+  defeatBoss(): void {
+    this.handle(this.run.defeatBoss(this.scene.time.now));
+  }
+
+  /** Empieza directamente por el jefe. */
+  skipToBoss(): void {
+    this.deps.director.clear();
+    this.handle(this.run.skipToBoss(this.scene.time.now));
+  }
+
   /** Salta a una oleada (pruebas). */
   skipTo(index: number): void {
     this.deps.director.clear();

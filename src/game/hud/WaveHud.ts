@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import { colorNumber, type ColorName } from '../../art/palette';
 import type { GameEvents } from '../../core/events/EventBus';
+import { ENDING_TEXT } from '../../content/boss';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 
 type TextFactory = (x: number, y: number, content: string, scale?: number) => Phaser.GameObjects.BitmapText;
@@ -57,6 +58,13 @@ export class WaveHud {
       this.shown = true;
       for (const part of [this.title, this.enemies, ...this.labels]) part.setVisible(true);
     }
+    // Contra el jefe, su barra de vida ocupa este sitio.
+    const boss = state.phase === 'boss' || state.phase === 'done';
+    for (const part of [this.title, this.enemies, ...this.labels]) part.setVisible(!boss);
+    if (boss) {
+      this.bars.clear();
+      return;
+    }
     const resting = state.phase === 'rest' || state.phase === 'intro' || state.phase === 'alarm';
     const seconds = Math.ceil(state.timeLeft / 1000);
     this.title.setText(state.wave === state.waves ? 'HORDA FINAL' : `OLEADA ${state.wave}/${state.waves}`);
@@ -99,6 +107,7 @@ export class WaveHud {
 
   /** Pantalla final del modo supervivencia. */
   showEnd(event: GameEvents['survivalEnd']): void {
+    if (event.victory) return this.showVictoryEnd(event);
     const veil = this.scene.add.graphics();
     veil.fillStyle(colorNumber('outline'), 0.75).fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     const minutes = Math.floor(event.timeMs / 60000);
@@ -107,6 +116,21 @@ export class WaveHud {
     this.text(CENTRE, 104, `OLEADAS ${event.waves}/${event.waves}   ZOMBIS ELIMINADOS ${event.kills}   TIEMPO ${minutes}:${seconds}`).setOrigin(0.5, 0);
     this.text(CENTRE, 124, 'PERO EL DEVORADOR YA ESTA AQUI. CONTINUARA...', 1).setOrigin(0.5, 0).setTint(colorNumber('blood1'));
     this.text(CENTRE, 150, 'PULSA R PARA JUGAR DE NUEVO').setOrigin(0.5, 0).setTint(colorNumber('light2'));
+    this.bigTitle.setVisible(false);
+    this.subtitle.setVisible(false);
+    this.danger = 0;
+  }
+
+  /** Tras el chasquido: negro, CONTINUARA y la promesa de una segunda parte. */
+  private showVictoryEnd(event: GameEvents['survivalEnd']): void {
+    const veil = this.scene.add.graphics();
+    veil.fillStyle(colorNumber('outline'), 1).fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    const minutes = Math.floor(event.timeMs / 60000);
+    const seconds = String(Math.floor((event.timeMs % 60000) / 1000)).padStart(2, '0');
+    this.text(CENTRE, 84, ENDING_TEXT.toBeContinued, 4).setOrigin(0.5, 0).setTint(colorNumber('blood1'));
+    this.text(CENTRE, 122, ENDING_TEXT.sequel).setOrigin(0.5, 0).setTint(colorNumber('grey1'));
+    this.text(CENTRE, 150, `ZOMBIS ELIMINADOS ${event.kills}   TIEMPO ${minutes}:${seconds}`).setOrigin(0.5, 0).setTint(colorNumber('grey2'));
+    this.text(CENTRE, 176, ENDING_TEXT.replay).setOrigin(0.5, 0).setTint(colorNumber('light2'));
     this.bigTitle.setVisible(false);
     this.subtitle.setVisible(false);
     this.danger = 0;

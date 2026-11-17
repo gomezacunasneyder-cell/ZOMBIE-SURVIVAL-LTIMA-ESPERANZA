@@ -15,13 +15,6 @@ async function waitGame(page: Page, ms: number): Promise<void> {
   await page.waitForFunction(([t, d]) => window.__ZS__!.sim!.state().time - t! >= d!, [start, ms]);
 }
 
-/** Mantiene teclas pulsadas durante un tiempo de juego. */
-async function holdGame(page: Page, keys: string[], ms: number): Promise<void> {
-  for (const key of keys) await page.keyboard.down(key);
-  await waitGame(page, ms);
-  for (const key of keys.slice().reverse()) await page.keyboard.up(key);
-}
-
 test.describe('enemigos', () => {
   test('los cuatro tipos aparecen con su propio aspecto', async ({ page }) => {
     await openGame(page);
@@ -57,9 +50,13 @@ test.describe('enemigos', () => {
     await page.waitForFunction(() => !window.__ZS__!.hudTexts!().some((t) => t.text === 'SIGILO'));
 
     // Ahora corre: lo oye y carga.
-    await holdGame(page, ['Shift', 'a'], 700);
+    // El ruido se mide mientras sigue corriendo: al parar se apaga enseguida.
+    await page.keyboard.down('Shift');
+    await page.keyboard.down('a');
     const heard = await until(page, (st) => st.zombies[0]!.state === 'chase', 3000);
     expect(heard.noise.level).toBeGreaterThan(0.3);
+    await page.keyboard.up('a');
+    await page.keyboard.up('Shift');
   });
 
   test('Chasqueador: acude a una explosión, chasquea al llegar y no va hacia Alex', async ({ page }) => {
