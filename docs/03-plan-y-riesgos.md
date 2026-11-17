@@ -36,14 +36,16 @@ Resultados en [decisiones/0003-fase-2.md](decisiones/0003-fase-2.md), que incluy
 
 **Criterio:** una captura del juego ya transmite la dirección artística del GDD.
 
-### Fase 3 · Arsenal y supervivencia — ARSENAL aprobado · SUMINISTROS terminados, pendientes de aprobación
+### Fase 3 · Arsenal y supervivencia — TERMINADA · arsenal aprobado; suministros, arrojadizos, piezas e inventario pendientes de aprobación
 
 Arsenal y combate en [decisiones/0004-fase-3-arsenal.md](decisiones/0004-fase-3-arsenal.md): pistola, escopeta, fusil de asalto y ametralladora, cambio de arma y HUD de combate.
 
 Suministros en [decisiones/0006-fase-3-suministros.md](decisiones/0006-fase-3-suministros.md): Cóndor 7, cajas en paracaídas con botín por rarezas, botiquines, lanzallamas y lanzacohetes.
 
-- ~~Resto de armas, cambio de arma~~, arrojadizos.
-- ~~Botiquines~~; inventario (Tab), piezas y objetos recogibles.
+Arrojadizos, piezas e inventario en [decisiones/0008-fase-3-mochila.md](decisiones/0008-fase-3-mochila.md): granada (G) y cóctel molotov (F), piezas que sueltan enemigos y contenedores, e inventario con Tab.
+
+- ~~Resto de armas, cambio de arma, arrojadizos.~~
+- ~~Botiquines, inventario (Tab), piezas y objetos recogibles.~~ Los objetos de misión llegarán con la campaña (Fase 5).
 - ~~Helicóptero Cóndor 7 y cajas de suministro.~~
 
 ### Fase 4 · Enemigos y hordas — TERMINADA, pendiente de aprobación

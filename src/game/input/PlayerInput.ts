@@ -20,11 +20,15 @@ export interface InputFrame {
   interactHeld: boolean;
   /** Q: usar un botiquín. */
   medkitPressed: boolean;
+  /** G lanza una granada y F un cóctel molotov. */
+  throwPressed: 'grenade' | 'molotov' | null;
+  /** Tab: abrir el inventario. */
+  inventoryPressed: boolean;
   /** Cualquier tecla de confirmación (para reintentar tras morir). */
   confirmPressed: boolean;
 }
 
-const KEYS = 'A,D,LEFT,RIGHT,SPACE,W,UP,SHIFT,R,ENTER,ONE,TWO,THREE,FOUR,FIVE,SIX,S,CTRL,E,Q';
+const KEYS = 'A,D,LEFT,RIGHT,SPACE,W,UP,SHIFT,R,ENTER,ONE,TWO,THREE,FOUR,FIVE,SIX,S,CTRL,E,Q,G,F,TAB';
 type KeyName =
   | 'A'
   | 'D'
@@ -45,7 +49,10 @@ type KeyName =
   | 'S'
   | 'CTRL'
   | 'E'
-  | 'Q';
+  | 'Q'
+  | 'G'
+  | 'F'
+  | 'TAB';
 const SLOT_KEYS: KeyName[] = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX'];
 
 /**
@@ -119,6 +126,8 @@ export class PlayerInput {
     const enterPressed = just('ENTER');
     const reloadPressed = just('R');
     const medkitPressed = just('Q');
+    const throwPressed = just('G') ? 'grenade' : just('F') ? 'molotov' : null;
+    const inventoryPressed = just('TAB');
 
     let slotPressed: number | null = null;
     for (let i = 0; i < WEAPON_SLOTS; i++) {
@@ -144,6 +153,8 @@ export class PlayerInput {
       cycle,
       interactHeld: k.E.isDown,
       medkitPressed,
+      throwPressed,
+      inventoryPressed,
       confirmPressed: enterPressed || reloadPressed || jumpPressed || firePressed,
     };
   }

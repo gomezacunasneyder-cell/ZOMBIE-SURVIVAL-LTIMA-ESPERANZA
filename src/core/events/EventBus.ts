@@ -50,6 +50,10 @@ export interface GameEvents extends Record<string, unknown> {
   playerDied: { kills: number };
   /** Botiquines que lleva y progreso del uso en curso (0–1), o `null`. */
   medkit: { count: number; max: number; progress: number | null };
+  /** Arrojadizos que lleva Alex (granadas y molotov). */
+  throwables: { items: { id: string; name: string; icon: string; count: number; max: number }[] };
+  /** Piezas reunidas y las que acaba de recoger. */
+  scrap: { total: number; gained: number };
   /**
    * Lanzamiento de Cóndor 7: `warning` (alarma de radio), `inbound`
    * (se acerca), `dropping` (suelta la carga), `leaving` y `done`.

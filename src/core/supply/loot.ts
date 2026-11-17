@@ -11,7 +11,7 @@ import type { Rng } from '../math/Rng';
  * - Las armas épicas tienen un tope por partida.
  * - Si varios lanzamientos seguidos no han traído ningún arma, el
  *   siguiente la garantiza («seguro de mala suerte»).
- * - Las piezas extra de una caja son solo munición o botiquines.
+ * - Las piezas extra de una caja nunca son armas (munición, botiquines o arrojadizos).
  */
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
@@ -22,7 +22,16 @@ export type LootItem =
   | { kind: 'weapon'; weaponId: string }
   /** Munición para un arma que Alex tenga; cuál se decide al abrir la caja. */
   | { kind: 'ammo' }
-  | { kind: 'medkit'; count: number };
+  | { kind: 'medkit'; count: number }
+  /** Granadas o cócteles molotov. */
+  | { kind: 'throwable'; throwableId: string; count: number };
+
+/** Identificador de una pieza: el arma o el arrojadizo concretos, o su clase. */
+export function lootId(item: LootItem): string {
+  if (item.kind === 'weapon') return item.weaponId;
+  if (item.kind === 'throwable') return item.throwableId;
+  return item.kind;
+}
 
 export interface LootEntry {
   id: string;

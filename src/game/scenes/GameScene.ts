@@ -2,42 +2,43 @@ import Phaser from 'phaser';
 import { SKINS } from '../../art/skins';
 import { CHAPTER_1 } from '../../content/chapters/chapter1';
 import { SURVIVAL_ARENA } from '../../content/chapters/survival';
-import { EXPLOSION } from '../../content/hazards';
 import { zoneAt, type LevelDef } from '../../content/level';
 import { GRAVITY, PLAYER_TUNING } from '../../content/player';
+import { STARTING_THROWABLES } from '../../content/throwables';
 import { LOADOUTS } from '../../content/weapons';
 import { EventBus, type GameEvents } from '../../core/events/EventBus';
-import { TRAUMA, explosionTrauma } from '../../core/fx/shake';
 import { Rng } from '../../core/math/Rng';
 import { ambienceAt } from '../../core/world/dayCycle';
 import { AudioDirector } from '../audio/AudioDirector';
 import { MASK } from '../boot/registerArt';
-import { SFX, playSfxAt } from '../boot/registerAudio';
-import { GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { GAME_HEIGHT } from '../config';
 import { buildSnapshot } from '../debug/snapshot';
 import { installGameHooks } from '../debug/gameHooks';
 import { updateTestHook, type LaunchOptions } from '../debug/testHook';
 import { Player } from '../entities/Player';
 import { SurvivalMode, type SurvivalAudio } from '../modes/SurvivalMode';
-import type { Zombie } from '../entities/Zombie';
 import { PlayerInput } from '../input/PlayerInput';
 import { AirdropSystem } from '../systems/AirdropSystem';
 import { AtmosphereSystem } from '../systems/AtmosphereSystem';
 import { BulletSystem } from '../systems/BulletSystem';
 import { BurnSystem } from '../systems/BurnSystem';
 import { CameraRig } from '../systems/CameraRig';
+import { CombatSystem } from '../systems/CombatSystem';
 import { DayNight } from '../systems/DayNight';
-import { ExplosionSystem, type Blast } from '../systems/ExplosionSystem';
+import { ExplosionSystem } from '../systems/ExplosionSystem';
 import { FxSystem } from '../systems/FxSystem';
 import { GunfireSystem } from '../systems/GunfireSystem';
 import { LightingSystem } from '../systems/LightingSystem';
 import { PickupSystem } from '../systems/PickupSystem';
 import { BarricadeSystem } from '../systems/BarricadeSystem';
 import { NoiseSystem } from '../systems/NoiseSystem';
+import { ScrapSystem } from '../systems/ScrapSystem';
+import { ThrowableSystem } from '../systems/ThrowableSystem';
 import { ZombieDirector } from '../systems/ZombieDirector';
 import { Backdrop } from '../world/Backdrop';
 import { buildLevel, type BuiltLevel } from '../world/LevelBuilder';
-import { BUS_KEY, SCENE } from './keys';
+import { inventoryView } from '../hud/inventoryView';
+import { BUS_KEY, OVERLAY_CLOSED_KEY, SCENE } from './keys';
 
 const WALL_TOP = 94;
 const GROUND_TOP = 172;
@@ -71,6 +72,9 @@ export class GameScene extends Phaser.Scene {
   private audio!: AudioDirector;
   private built!: BuiltLevel;
   private gunfire!: GunfireSystem;
+  private combat!: CombatSystem;
+  private scrap!: ScrapSystem;
+  private throwables!: ThrowableSystem;
   private currentZone = '';
   private diedAt: number | null = null;
   /** Modo supervivencia (`?modo=oleadas`), o `null` en la campaña. */
@@ -107,7 +111,7 @@ export class GameScene extends Phaser.Scene {
       rocketTrail: (x, y) => this.fx.dustPuff(x, y, 1),
     });
     this.controls = new PlayerInput(this);
-    this.player = new Player(this, level.spawnX, level.playLine, this.bus, PLAYER_TUNING, SKINS[options.skin], LOADOUTS[options.loadout]);
+    this.player = new Player(this, level.spawnX, level.playLine, this.bus, PLAYER_TUNING, SKINS[options.skin], LOADOUTS[options.loadout], STARTING_THROWABLES[options.loadout]);
     this.noise = new NoiseSystem(this.bus);
     this.barricades = new BarricadeSystem(this, this.fx, this.built.barricades);
     this.director = new ZombieDirector(
@@ -124,9 +128,10 @@ export class GameScene extends Phaser.Scene {
     );
     if (!options.test) for (const enemy of level.enemies) this.director.spawn(enemy.x, enemy.kind);
 
-    this.burns = new BurnSystem(this, this.lighting, (zombie, damage, now) => this.damageZombie(zombie, damage, 0, now, undefined, true));
+    this.burns = new BurnSystem(this, this.lighting, (zombie, damage, now) => this.combat.damageZombie(zombie, damage, 0, now, undefined, true));
     // Sin semilla en la URL, cada partida es distinta: unas tienen suministros al azar y otras no.
     const seed = options.seed ?? Math.floor(Math.random() * 2 ** 31);
+    this.scrap = new ScrapSystem(this, new Rng(seed + 2), level.playLine);
     this.airdrop = new AirdropSystem(this, {
       lighting: this.lighting,
       fx: this.fx,
@@ -143,12 +148,36 @@ export class GameScene extends Phaser.Scene {
     this.pickups = new PickupSystem(this, level.pickups, level.playLine, this.bus);
     this.atmosphere = new AtmosphereSystem(this, this.fx, this.lighting, this.built.fires, this.built.sparkers, this.built.alarms, level.playLine);
     this.explosions = new ExplosionSystem(this, this.lighting, this.fx, this.atmosphere, this.built.explosives, level.playLine, (blast) =>
-      this.handleBlast(blast),
+      this.combat.blast(blast),
     );
+    this.throwables = new ThrowableSystem(this, {
+      lighting: this.lighting,
+      fx: this.fx,
+      atmosphere: this.atmosphere,
+      explosions: this.explosions,
+      noise: this.noise,
+      burns: this.burns,
+      zombies: () => this.director.zombies,
+      solids: this.built.solids,
+      groundY: level.playLine,
+      player: () => this.player,
+      hurtPlayer: (damage, fromX, now) => this.combat.hurtPlayer(damage, fromX, now, 0.4),
+    });
     this.dayNight = new DayNight(this.lighting, this.backdrop, this.built.lamps, this.bus);
     this.dayNight.setFixed(options.night);
     this.audio = new AudioDirector(this);
     this.cameraRig = new CameraRig(this.cameras.main, level.width);
+    this.combat = new CombatSystem(this, {
+      player: this.player,
+      director: this.director,
+      fx: this.fx,
+      cameraRig: this.cameraRig,
+      noise: this.noise,
+      scrap: this.scrap,
+      bus: this.bus,
+      groundY: level.playLine,
+      onPlayerDied: (now) => (this.diedAt = now),
+    });
     this.gunfire = new GunfireSystem(this, {
       bullets: this.bullets,
       fx: this.fx,
@@ -158,7 +187,7 @@ export class GameScene extends Phaser.Scene {
       muzzleLight: this.lighting.addLight(MASK.radialMedium, 0, 0, { intensity: 1 }),
       noise: this.noise,
       burns: this.burns,
-      damageZombie: (zombie, damage, pushX, now, fire) => this.damageZombie(zombie, damage, pushX, now, this.player.x, fire),
+      damageZombie: (zombie, damage, pushX, now, fire) => this.combat.damageZombie(zombie, damage, pushX, now, this.player.x, fire),
     });
 
     this.survival = survival
@@ -204,8 +233,9 @@ export class GameScene extends Phaser.Scene {
       explosions: this.explosions,
       airdrop: this.airdrop,
       survival: this.survival,
-      hurtPlayer: (amount) => this.hurtPlayer(amount, this.player.x + 1, this.time.now, 0),
-      kill: (zombie) => this.damageZombie(zombie, 1e6, 0, this.time.now),
+      scrap: this.scrap,
+      hurtPlayer: (amount) => this.combat.hurtPlayer(amount, this.player.x + 1, this.time.now, 0),
+      kill: (zombie) => this.combat.damageZombie(zombie, 1e6, 0, this.time.now),
     });
     if (options.airdropNow) this.time.delayedCall(400, () => this.airdrop.call(this.time.now));
     this.afterPhysics(this.time.now, 0);
@@ -217,7 +247,7 @@ export class GameScene extends Phaser.Scene {
     this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.afterPhysics, this);
     const resume = (): void => this.controls.reset();
     this.events.on(Phaser.Scenes.Events.RESUME, resume);
-    const pause = (): void => this.openOptions();
+    const pause = (): void => this.openOverlay(SCENE.options);
     this.input.keyboard?.on('keydown-ESC', pause);
     this.input.keyboard?.on('keydown-P', pause);
 
@@ -232,11 +262,13 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Detiene el juego y abre la pausa con los ajustes de sonido. */
-  private openOptions(): void {
+  /** Detiene el juego y abre encima la pausa o el inventario. */
+  private openOverlay(key: string, data?: object): void {
     if (this.diedAt !== null || this.scene.isPaused()) return;
+    const closedAt = (this.registry.get(OVERLAY_CLOSED_KEY) as number | undefined) ?? -Infinity;
+    if (performance.now() - closedAt < 200) return;
     this.scene.pause();
-    this.scene.launch(SCENE.options);
+    this.scene.launch(key, data);
   }
 
   override update(time: number, delta: number): void {
@@ -248,6 +280,10 @@ export class GameScene extends Phaser.Scene {
     } else {
       const shot = this.player.update(time, delta, input, this.controls.aimPoint());
       if (shot) this.gunfire.fire(shot, time);
+      if (input.throwPressed && this.player.tryThrow(input.throwPressed, time)) {
+        this.throwables.launch(input.throwPressed, this.player.throwOrigin, this.controls.aimPoint(), this.player.facing, time);
+      }
+      if (input.inventoryPressed) this.openOverlay(SCENE.inventory, inventoryView(this.player, () => this.time.now));
       if (this.player.landed) this.fx.dustPuff(this.player.x, this.level.playLine);
 
       this.noise.update(time, delta, this.player.x, this.player.movementNoise, this.player.sneaking);
@@ -255,8 +291,8 @@ export class GameScene extends Phaser.Scene {
         time,
         { x: this.player.x, centerY: this.player.centerY, alive: this.player.alive },
         {
-          strike: (zombie) => this.handleStrike(zombie, time),
-          swing: (zombie) => this.handleSwing(zombie),
+          strike: (zombie) => this.combat.strike(zombie, time),
+          swing: (zombie) => this.combat.swing(zombie),
           smash: (zombie, barricade) => {
             // Solo el mazazo del mutante sacude la pantalla: en la horda golpean decenas a la vez.
             this.cameraRig.addTrauma(zombie.def.id === 'mutant' ? 0.35 : 0.03);
@@ -266,6 +302,7 @@ export class GameScene extends Phaser.Scene {
         },
       );
       this.pickups.update(this.player);
+      this.scrap.update(time, delta, this.player);
       this.airdrop.update(time, delta, input.interactHeld);
       if (this.survival) {
         this.survivalAudio = this.survival.update(time, delta);
@@ -275,6 +312,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.bullets.update(time);
     this.burns.update(time);
+    this.throwables.update(time);
     this.explosions.update(time);
     this.atmosphere.update(time, delta);
   }
@@ -300,58 +338,6 @@ export class GameScene extends Phaser.Scene {
       danger: this.survivalAudio.danger,
       hush: this.survivalAudio.hush,
     });
-  }
-
-  // ───────────────────────── Combate ─────────────────────────
-
-  private handleStrike(zombie: Zombie, now: number): void {
-    const attack = zombie.def.attack;
-    this.hurtPlayer(attack.damage, zombie.x, now, attack.shove);
-  }
-
-  /** El mazazo del mutante sacude la pantalla y levanta polvo, alcance o no. */
-  private handleSwing(zombie: Zombie): void {
-    if (zombie.def.id !== 'mutant') return;
-    this.cameraRig.addTrauma(0.6);
-    this.fx.dustPuff(zombie.x + (zombie.flipX ? -14 : 14), this.level.playLine, 14);
-    playSfxAt(this, SFX.slam, zombie.x, 0.6);
-  }
-
-  private hurtPlayer(damage: number, fromX: number, now: number, shove = 1): void {
-    if (!this.player.takeHit(damage, fromX, now, shove)) return;
-    this.fx.bloodBurst(this.player.x, this.player.centerY, 6);
-    this.cameraRig.addTrauma(TRAUMA.playerHit * Math.min(1.6, shove));
-    if (!this.player.alive) {
-      this.diedAt = now;
-      this.bus.emit('playerDied', { kills: this.director.kills });
-    }
-  }
-
-  private damageZombie(zombie: Zombie, damage: number, pushX: number, now: number, fromX?: number, fire = false): void {
-    const killed = zombie.hit(damage, pushX, now, fromX, fire);
-    if (!killed) return;
-    this.director.registerKill();
-    this.fx.bloodDecal(zombie.x, this.level.playLine + 4);
-    playSfxAt(this, SFX.deathCry, zombie.x, 0.45);
-  }
-
-  /** Reparte los efectos de una explosión: daño por distancia, sacudida y alerta. */
-  private handleBlast(blast: Blast): void {
-    const now = this.time.now;
-    for (const zombie of this.director.zombies) {
-      if (!zombie.alive) continue;
-      const distance = Math.hypot(zombie.x - blast.x, zombie.y - 12 - blast.y);
-      const damage = blast.enemyDamageAt(distance);
-      if (damage > 0) this.damageZombie(zombie, damage, Math.sign(zombie.x - blast.x || 1) * blast.knockback, now, blast.x);
-    }
-    const reach = Math.hypot(this.player.x - blast.x, this.player.centerY - blast.y);
-    const damage = this.player.alive ? blast.playerDamageAt(reach) : 0;
-    if (damage > 0) this.hurtPlayer(damage, blast.x, now);
-
-    const cameraCentre = this.cameras.main.scrollX + GAME_WIDTH / 2;
-    this.cameraRig.addTrauma(explosionTrauma(Math.abs(blast.x - cameraCentre)));
-    // Una explosión se oye en media ciudad (la provoca Alex con sus disparos).
-    this.noise.emit(blast.x, EXPLOSION.noiseRadius, 'explosion', now, true);
   }
 
   private wireCollisions(solids: Phaser.GameObjects.Zone[]): void {
@@ -394,6 +380,8 @@ export class GameScene extends Phaser.Scene {
       airdrop: this.airdrop,
       burns: this.burns,
       survival: this.survival,
+      throwables: this.throwables,
+      scrap: this.scrap,
     });
   }
 }

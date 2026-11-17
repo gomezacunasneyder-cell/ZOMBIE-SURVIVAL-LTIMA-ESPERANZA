@@ -24,6 +24,10 @@ export interface SimHook {
   hurtPlayer(amount: number): void;
   /** Da un arma a Alex como si saliera de una caja. */
   giveWeapon(id: string): void;
+  /** Da granadas o molotov a Alex. */
+  giveThrowable(id: string, count: number): void;
+  /** Deja piezas en el suelo junto a `x`. */
+  dropScrap(x: number, amount: number): void;
   /** Modo supervivencia: salta a la oleada `wave` (1…5). */
   skipToWave(wave: number): void;
   /** Mata a todos los enemigos en pie (cuentan como bajas). */
@@ -57,6 +61,8 @@ export interface TestHook {
   frameSignature?: (name: string) => string;
   /** La pausa con ajustes de sonido está abierta. */
   optionsOpen?: boolean;
+  /** El inventario (Tab) está abierto. */
+  inventoryOpen?: boolean;
 }
 
 declare global {

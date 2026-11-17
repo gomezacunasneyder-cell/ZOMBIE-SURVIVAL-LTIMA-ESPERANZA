@@ -1,4 +1,5 @@
 import { RARITY_COLOR, rarityOf } from '../../content/supplies';
+import { throwableById } from '../../content/throwables';
 import { weaponById } from '../../content/weapons';
 import type { LootItem } from '../../core/supply/loot';
 import type { Player } from '../entities/Player';
@@ -56,6 +57,11 @@ export function applyLoot(player: Player, items: readonly LootItem[], now: numbe
       const def = id ? weaponById(id) : undefined;
       const added = def ? player.weapons.addAmmo(def.id, def.pickupRounds) : 0;
       if (def && added > 0) lines.push({ text: `${def.ammoName} +${added}`, color });
+      else leftovers.push(item);
+    } else if (item.kind === 'throwable') {
+      const def = throwableById(item.throwableId);
+      const added = def ? player.addThrowable(def.id, item.count) : 0;
+      if (def && added > 0) lines.push({ text: `${def.name} +${added}`, color });
       else leftovers.push(item);
     } else {
       const added = player.addMedkits(item.count);

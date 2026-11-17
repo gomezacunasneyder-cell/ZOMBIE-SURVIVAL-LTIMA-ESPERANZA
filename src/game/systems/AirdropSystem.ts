@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import { colorNumber, type ColorName } from '../../art/palette';
 import type { LevelDef } from '../../content/level';
 import { SOLIDS } from '../../content/level';
+import { SCRAP } from '../../content/scrap';
 import {
   AIRDROP_SCHEDULE,
   CRATE,
@@ -14,7 +15,7 @@ import {
 import type { EventBus, GameEvents } from '../../core/events/EventBus';
 import type { Rng } from '../../core/math/Rng';
 import { AirdropFlight, AirdropScheduler, chooseDropPoints, type FlightEvent } from '../../core/supply/airdrop';
-import { nextContext, rollDrop, type CrateLoot, type DropContext } from '../../core/supply/loot';
+import { lootId, nextContext, rollDrop, type CrateLoot, type DropContext } from '../../core/supply/loot';
 import { ATLAS_KEY, FONT_KEY } from '../boot/registerArt';
 import { SFX, playSfx } from '../boot/registerAudio';
 import { GAME_WIDTH } from '../config';
@@ -263,6 +264,14 @@ export class AirdropSystem {
     if (progress < 1) return;
     this.opening = null;
     const result = applyLoot(player, crate.items, now);
+    // Cada caja trae además unas piezas, solo la primera vez que se abre.
+    if (!crate.scrapGiven) {
+      crate.scrapGiven = true;
+      // Cantidad según el punto de caída: no gasta números de la semilla de los lanzamientos.
+      const [least, most] = SCRAP.crate;
+      const scrap = player.addScrap(least + (Math.abs(Math.round(crate.x)) % (most - least + 1)));
+      result.lines.splice(result.lines.length - (result.leftovers.length > 0 ? 1 : 0), 0, { text: `PIEZAS +${scrap}`, color: 'grey1' });
+    }
     crate.open(now, result.leftovers);
     if (result.newWeapons.length === 0) playSfx(this.scene, SFX.pickup, 0.45, 0);
     else playSfx(this.scene, SFX.equip, 0.6, 0);
@@ -327,7 +336,7 @@ export class AirdropSystem {
         x: c.x,
         y: c.y,
         state: c.state,
-        items: c.items.map((item) => (item.kind === 'weapon' ? item.weaponId : item.kind)),
+        items: c.items.map(lootId),
         rarity: c.rarity,
       })),
       opening: this.opening ? Math.min(1, (this.scene.time.now - this.opening.startedAt) / CRATE.openMs) : null,

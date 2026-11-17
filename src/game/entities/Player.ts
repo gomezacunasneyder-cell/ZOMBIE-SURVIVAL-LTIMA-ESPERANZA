@@ -6,6 +6,9 @@ import { aimDegreesTowards, snapAimAngle, type AimAngle } from '../../core/comba
 import type { Resupply } from '../../core/combat/Arsenal';
 import { Health } from '../../core/combat/Health';
 import { Medkits } from '../../core/combat/Medkits';
+import { Throwables } from '../../core/combat/Throwables';
+import { ScrapWallet } from '../../core/economy/Scrap';
+import { THROWABLES, THROW_COOLDOWN_MS } from '../../content/throwables';
 import type { WeaponState } from '../../core/combat/WeaponState';
 import type { EventBus, GameEvents } from '../../core/events/EventBus';
 import { movementNoise } from '../../core/ai/noise';
@@ -40,6 +43,8 @@ export class Player {
   readonly sprite: Phaser.Physics.Arcade.Sprite;
   readonly health: Health;
   readonly medkits = new Medkits(MEDKIT, STARTING_MEDKITS);
+  readonly throwables: Throwables;
+  readonly scrap = new ScrapWallet();
   facing: 1 | -1 = 1;
 
   private readonly rig: AimRig;
@@ -71,7 +76,9 @@ export class Player {
     private readonly tuning: PlayerTuning,
     readonly skin: PlayerSkin,
     loadout?: readonly (WeaponDef | null)[],
+    throwables: Readonly<Record<string, number>> = {},
   ) {
+    this.throwables = new Throwables(THROWABLES, THROW_COOLDOWN_MS, throwables);
     this.health = new Health(tuning.maxHealth, tuning.invulnerableMs);
     this.jump = new JumpController(tuning);
     this.arms = new WeaponHandler(scene, bus, loadout);
@@ -163,6 +170,52 @@ export class Player {
     this.bus.emit('health', { current: this.health.current, max: this.health.max });
     this.arms.announce();
     this.emitMedkit();
+    this.emitThrowables();
+    this.bus.emit('scrap', { total: this.scrap.total, gained: 0 });
+  }
+
+  private emitThrowables(): void {
+    this.bus.emit('throwables', {
+      items: THROWABLES.map((def) => ({ id: def.id, name: def.name, icon: def.icon, count: this.throwables.count(def.id), max: def.max })),
+    });
+  }
+
+  /** Recoge arrojadizos. Devuelve cuántos cupieron. */
+  addThrowable(id: string, count: number): number {
+    const added = this.throwables.add(id, count);
+    if (added > 0) this.emitThrowables();
+    return added;
+  }
+
+  /** Recoge piezas. Devuelve cuántas. */
+  addScrap(amount: number): number {
+    const added = this.scrap.add(amount);
+    if (added > 0) this.bus.emit('scrap', { total: this.scrap.total, gained: added });
+    return added;
+  }
+
+  /**
+   * Intenta lanzar un arrojadizo. No se puede mientras se cura, cambia de
+   * arma o está aturdido; lanzar interrumpe la recarga. Devuelve si salió.
+   */
+  tryThrow(id: string, now: number): boolean {
+    if (!this.alive || this.medkits.using || now < this.hurtUntil || this.arms.isSwitching(now)) return false;
+    const result = this.throwables.throw(id, now);
+    if (result === 'none') {
+      const def = THROWABLES.find((d) => d.id === id);
+      this.bus.emit('notice', { text: `SIN ${def?.name ?? 'ARROJADIZOS'}` });
+      return false;
+    }
+    if (result !== 'thrown') return false;
+    this.arms.cancelReload();
+    this.rig.nudge(now, { kickPx: 4, durationMs: 220 });
+    this.emitThrowables();
+    return true;
+  }
+
+  /** Hombro desde el que sale lo que lanza. */
+  get throwOrigin(): Point {
+    return this.rig.shoulder(this.facing);
   }
 
   private emitMedkit(): void {

@@ -33,6 +33,7 @@ import {
   synthRadioAlarm,
   synthRadioChatter,
 } from '../../audio/synth/supplies';
+import { synthGlassBreak, synthGrenadeBounce, synthScrapPickup, synthThrowSwish } from '../../audio/synth/throwables';
 import { positional } from '../../core/settings/audioSettings';
 import { audioState } from '../audio/audioState';
 import { GAME_WIDTH } from '../config';
@@ -68,6 +69,10 @@ export const SFX = {
   crateOpen: 'sfx/crate-open',
   flare: 'sfx/flare',
   medkit: 'sfx/medkit',
+  throwSwish: 'sfx/throw-swish',
+  grenadeBounce: 'sfx/grenade-bounce',
+  glassBreak: 'sfx/glass-break',
+  scrap: 'sfx/scrap',
 } as const;
 
 /** Disparo propio de cada arma: `sfx/shot/<id>`. */
@@ -128,6 +133,10 @@ const RECIPES: Record<SfxKey | LoopKey, Recipe> = {
   [SFX.crateOpen]: synthCrateOpen,
   [SFX.flare]: synthFlare,
   [SFX.medkit]: synthMedkit,
+  [SFX.throwSwish]: synthThrowSwish,
+  [SFX.grenadeBounce]: synthGrenadeBounce,
+  [SFX.glassBreak]: synthGlassBreak,
+  [SFX.scrap]: synthScrapPickup,
   [LOOP.wind]: synthWindLoop,
   [LOOP.helicopter]: synthHelicopterLoop,
   [LOOP.alarm]: synthAlarmLoop,

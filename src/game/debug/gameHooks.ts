@@ -8,6 +8,7 @@ import type { AirdropSystem } from '../systems/AirdropSystem';
 import type { CameraRig } from '../systems/CameraRig';
 import type { DayNight } from '../systems/DayNight';
 import type { ExplosionSystem } from '../systems/ExplosionSystem';
+import type { ScrapSystem } from '../systems/ScrapSystem';
 import type { ZombieDirector } from '../systems/ZombieDirector';
 import type { SimState } from './simState';
 import { installSimHook } from './testHook';
@@ -24,6 +25,7 @@ export interface GameHookSources {
   explosions: ExplosionSystem;
   airdrop: AirdropSystem;
   survival: SurvivalMode | null;
+  scrap: ScrapSystem;
   hurtPlayer(amount: number): void;
   kill(zombie: Zombie): void;
 }
@@ -48,6 +50,8 @@ export function installGameHooks(src: GameHookSources): void {
       const def = weaponById(id);
       if (def) player.weapons.grant(def, src.now());
     },
+    giveThrowable: (id, count) => void player.addThrowable(id, count),
+    dropScrap: (x, amount) => src.scrap.drop(x, amount, src.now()),
     skipToWave: (wave) => src.survival?.waves.skipTo(wave - 1),
     killAll: () => {
       for (const zombie of [...director.zombies]) if (zombie.alive) src.kill(zombie);

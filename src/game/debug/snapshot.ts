@@ -12,6 +12,8 @@ import type { ExplosionSystem } from '../systems/ExplosionSystem';
 import type { FxSystem } from '../systems/FxSystem';
 import type { NoiseSystem } from '../systems/NoiseSystem';
 import type { PickupSystem } from '../systems/PickupSystem';
+import type { ScrapSystem } from '../systems/ScrapSystem';
+import type { ThrowableSystem } from '../systems/ThrowableSystem';
 import type { ZombieDirector } from '../systems/ZombieDirector';
 import type { BuiltLevel } from '../world/LevelBuilder';
 import type { SimState } from './simState';
@@ -36,6 +38,8 @@ export interface SnapshotSources {
   airdrop: AirdropSystem;
   burns: BurnSystem;
   survival: SurvivalMode | null;
+  throwables: ThrowableSystem;
+  scrap: ScrapSystem;
 }
 
 /** Estado resumido del juego para las pruebas de navegador. */
@@ -110,6 +114,15 @@ export function buildSnapshot(src: SnapshotSources): SimState {
     barricades: src.built.barricades.map((b) => ({ x: b.x, hits: b.hits, broken: b.broken })),
     airdrop: src.airdrop.snapshot(),
     medkits: { count: player.medkits.count, using: player.medkits.using },
+    throwables: {
+      grenade: player.throwables.count('grenade'),
+      molotov: player.throwables.count('molotov'),
+      flying: src.throwables.snapshot(),
+      fires: src.throwables.counts.fires,
+      thrown: src.throwables.counts.thrown,
+      exploded: src.throwables.counts.exploded,
+    },
+    scrap: { total: player.scrap.total, onGround: src.scrap.onGround, dropped: src.scrap.totalDropped },
     burning: src.burns.count,
     pool: director.poolStats,
     alive: director.aliveCount,

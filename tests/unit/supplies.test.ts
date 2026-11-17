@@ -25,7 +25,7 @@ import {
   crateFall,
   type FlightEvent,
 } from '../../src/core/supply/airdrop';
-import { nextContext, rollDrop, type DropContext, type LootItem } from '../../src/core/supply/loot';
+import { lootId, nextContext, rollDrop, type DropContext, type LootItem } from '../../src/core/supply/loot';
 import { colorNames } from '../../src/art/palette';
 
 const fresh = (owned: string[] = ['pistol']): DropContext => ({ ownedWeapons: new Set(owned), epicGiven: 0, dropsWithoutWeapon: 0 });
@@ -56,7 +56,7 @@ describe('tabla de botín', () => {
       // Sin armas en propiedad y sin topes: mide la tabla tal cual.
       const [crate] = rollDrop(rng, { ...LOOT_TABLE, extraItemChance: 0, maxEpicPerRun: 99, pityAfterDrops: 99 }, 1, fresh([]));
       const item = crate!.items[0]!;
-      const id = item.kind === 'weapon' ? item.weaponId : item.kind;
+      const id = lootId(item);
       counts.set(id, (counts.get(id) ?? 0) + 1);
     }
     for (const entry of LOOT_TABLE.entries) {
@@ -125,9 +125,7 @@ describe('tabla de botín', () => {
       for (const crate of rollDrop(rng, LOOT_TABLE, 3, fresh())) {
         const best = Math.max(
           ...crate.items.map((item) => {
-            const entry = LOOT_TABLE.entries.find((e) =>
-              item.kind === 'weapon' ? e.item.kind === 'weapon' && e.item.weaponId === item.weaponId : e.item.kind === item.kind,
-            );
+            const entry = LOOT_TABLE.entries.find((e) => lootId(e.item) === lootId(item));
             return rank.indexOf(entry!.rarity);
           }),
         );

@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { SCRAP } from '../../content/scrap';
 import type { EventBus, GameEvents } from '../../core/events/EventBus';
 import { ATLAS_KEY } from '../boot/registerArt';
 import { SFX, playSfx } from '../boot/registerAudio';
@@ -45,7 +46,9 @@ export class PickupSystem {
       const supply = player.resupply();
       if (!supply) continue;
       playSfx(this.scene, SFX.pickup, 0.45, 0);
-      this.bus.emit('notice', { text: `${supply.def.ammoName} +${supply.added}` });
+      // Las cajas de munición traen también unas piezas.
+      player.addScrap(SCRAP.ammoBox);
+      this.bus.emit('notice', { text: `${supply.def.ammoName} +${supply.added}  PIEZAS +${SCRAP.ammoBox}` });
       pickup.crate.destroy();
       pickup.marker.destroy();
       this.pickups.splice(i, 1);

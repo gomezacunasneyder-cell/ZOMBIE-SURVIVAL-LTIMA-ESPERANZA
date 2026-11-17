@@ -6,7 +6,7 @@ import { FONT_KEY } from '../boot/registerArt';
 import { SFX, playSfx } from '../boot/registerAudio';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { updateTestHook } from '../debug/testHook';
-import { SCENE } from './keys';
+import { OVERLAY_CLOSED_KEY, SCENE } from './keys';
 
 const ROWS: { bus: AudioBus; label: string }[] = [
   { bus: 'music', label: 'MUSICA' },
@@ -124,6 +124,7 @@ export class OptionsScene extends Phaser.Scene {
 
   private close(): void {
     updateTestHook({ optionsOpen: false });
+    this.registry.set(OVERLAY_CLOSED_KEY, performance.now());
     this.scene.stop();
     this.scene.resume(SCENE.game);
   }

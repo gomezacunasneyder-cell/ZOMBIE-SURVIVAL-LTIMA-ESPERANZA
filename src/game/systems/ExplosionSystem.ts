@@ -81,6 +81,13 @@ export class ExplosionSystem {
     return true;
   }
 
+  /** Hace estallar los bidones a menos de `radius` de `x` (fuego de un molotov). */
+  igniteWithin(x: number, radius: number): number {
+    const near = this.explosives.filter((barrel) => !barrel.exploded && Math.abs(barrel.x - x) <= radius);
+    near.forEach((barrel, i) => this.scene.time.delayedCall(EXPLOSION.chainDelayMs * (i + 1), () => this.explode(barrel)));
+    return near.length;
+  }
+
   /** Hace estallar el bidón más cercano a `x` (para pruebas). */
   detonateNear(x: number): boolean {
     const live = this.explosives.filter((barrel) => !barrel.exploded);

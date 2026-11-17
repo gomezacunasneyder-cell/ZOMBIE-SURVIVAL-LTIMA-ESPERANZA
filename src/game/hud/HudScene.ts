@@ -7,6 +7,7 @@ import { updateTestHook, type TextBounds } from '../debug/testHook';
 import { BUS_KEY, SCENE } from '../scenes/keys';
 import { AirdropHud } from './AirdropHud';
 import { NoiseMeter } from './NoiseMeter';
+import { PackHud } from './PackHud';
 import { WaveHud } from './WaveHud';
 import { PANEL, WeaponPanel } from './WeaponPanel';
 
@@ -41,6 +42,7 @@ export class HudScene extends Phaser.Scene {
   private medkitText!: Phaser.GameObjects.BitmapText;
   private medkitIcon!: Phaser.GameObjects.Image;
   private airdropHud!: AirdropHud;
+  private packHud!: PackHud;
   private waveHud!: WaveHud;
   private killsText!: Phaser.GameObjects.BitmapText;
   private skull!: Phaser.GameObjects.Image;
@@ -68,6 +70,7 @@ export class HudScene extends Phaser.Scene {
     this.buildHealth();
     this.noiseMeter = new NoiseMeter(this, MARGIN, MARGIN + 22, (x, y, content) => this.text(x, y, content));
     this.buildKills();
+    this.packHud = new PackHud(this, BAR.x + BAR.width + 54, MARGIN, GAME_WIDTH - MARGIN, MARGIN + 17, (x, y, content, scale) => this.text(x, y, content, scale));
     this.panel = new WeaponPanel(this, PANEL_X, PANEL_Y, (x, y, content, scale) => this.text(x, y, content, scale));
     this.buildMessages();
     this.airdropHud = new AirdropHud(this, (x, y, content, scale) => this.text(x, y, content, scale));
@@ -94,6 +97,8 @@ export class HudScene extends Phaser.Scene {
       bus.on('daytime', (e) => this.phaseText.setText(e.phase)),
       bus.on('playerDied', (e) => this.showGameOver(e.kills)),
       bus.on('medkit', (e) => this.showMedkits(e.count, e.max, e.progress)),
+      bus.on('throwables', (e) => this.packHud.showThrowables(e)),
+      bus.on('scrap', (e) => this.packHud.showScrap(e)),
       bus.on('airdrop', (e) => this.airdropHud.onAirdrop(e)),
       bus.on('wave', (e) => this.waveHud.onWave(e)),
       bus.on('announce', (e) => this.waveHud.onAnnounce(e)),
@@ -114,6 +119,7 @@ export class HudScene extends Phaser.Scene {
     if (this.zoneTitle.visible && time >= this.zoneUntil) this.zoneTitle.setVisible(false);
     this.panel.update(time);
     this.airdropHud.update(time);
+    this.packHud.update(time);
     this.waveHud.update(time);
     this.updateCrosshair();
   }
@@ -189,10 +195,11 @@ export class HudScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
       .setTint(colorNumber('light2'))
       .setVisible(false);
-    // Dos líneas para no invadir el panel de armas.
+    // Líneas cortas para no invadir el panel de armas.
     const hints = [
-      this.text(MARGIN, GAME_HEIGHT - MARGIN - 12, 'A/D MOVER  SHIFT CORRER  S/CTRL SIGILO  ESPACIO SALTAR  ESC PAUSA'),
-      this.text(MARGIN, GAME_HEIGHT - MARGIN - 5, 'CLIC DISPARAR  R RECARGAR  1-6/RUEDA ARMA  Q BOTIQUIN  E ABRIR'),
+      this.text(MARGIN, GAME_HEIGHT - MARGIN - 19, 'A/D MOVER  SHIFT CORRER  S/CTRL SIGILO  ESPACIO SALTAR  ESC PAUSA'),
+      this.text(MARGIN, GAME_HEIGHT - MARGIN - 12, 'CLIC DISPARAR  R RECARGAR  1-6/RUEDA ARMA  E ABRIR CAJAS'),
+      this.text(MARGIN, GAME_HEIGHT - MARGIN - 5, 'Q BOTIQUIN  G GRANADA  F MOLOTOV  TAB INVENTARIO'),
     ];
     this.time.delayedCall(14000, () => hints.forEach((hint) => hint.setVisible(false)));
   }

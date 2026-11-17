@@ -153,7 +153,8 @@ export class WeaponHandler {
     }
   }
 
-  private select(slot: number, now: number): void {
+  /** Equipa el arma de una ranura (teclas 1–6 o desde el inventario). */
+  select(slot: number, now: number): void {
     const result = this.arsenal.select(slot, now);
     if (result === 'empty-slot') this.bus.emit('notice', { text: `RANURA ${slot + 1} VACIA` });
     if (result === 'switched') this.onSwitched();

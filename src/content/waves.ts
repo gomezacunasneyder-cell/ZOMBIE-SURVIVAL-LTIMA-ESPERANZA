@@ -76,7 +76,7 @@ export const SURVIVAL_WAVES: readonly SurvivalWave[] = [
     maxAlive: 14,
     sides: 'both',
     restMs: 12_000,
-    reward: { items: [{ kind: 'ammo' }, { kind: 'ammo' }], weapons: ['mg', 'rifle'] },
+    reward: { items: [{ kind: 'ammo' }, { kind: 'ammo' }, { kind: 'throwable', throwableId: 'grenade', count: 2 }], weapons: ['mg', 'rifle'] },
   },
   {
     title: 'OLEADA 4',
@@ -93,7 +93,11 @@ export const SURVIVAL_WAVES: readonly SurvivalWave[] = [
     sides: 'both',
     restMs: 15_000,
     lastKinds: ['mutant'],
-    reward: { items: [{ kind: 'medkit', count: 1 }, { kind: 'ammo' }, { kind: 'ammo' }], weapons: ['flamer', 'rocket', 'mg'] },
+    // Antes de la horda: con qué defender la barricada.
+    reward: {
+      items: [{ kind: 'medkit', count: 1 }, { kind: 'ammo' }, { kind: 'ammo' }, { kind: 'throwable', throwableId: 'molotov', count: 2 }, { kind: 'throwable', throwableId: 'grenade', count: 1 }],
+      weapons: ['flamer', 'rocket', 'mg'],
+    },
   },
   {
     title: 'HORDA FINAL',

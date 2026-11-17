@@ -106,6 +106,12 @@ export class AimRig {
     if (this.gun.pump) this.pumpFrom = now + PUMP_DELAY_MS;
   }
 
+  /** Sacudida del brazo sin fogonazo (al lanzar un arrojadizo). */
+  nudge(now: number, recoil: RigRecoil): void {
+    this.recoil = recoil;
+    this.recoilFrom = now;
+  }
+
   setVisible(visible: boolean): void {
     this.arm.setVisible(visible);
     if (!visible) this.flash.setVisible(false);

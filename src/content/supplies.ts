@@ -4,7 +4,7 @@
  */
 
 import type { AirdropSchedule, DropPointRules, FallRules, FlightRules } from '../core/supply/airdrop';
-import type { LootItem, LootTable, Rarity } from '../core/supply/loot';
+import { lootId, type LootItem, type LootTable, type Rarity } from '../core/supply/loot';
 
 /**
  * Cuándo hay lanzamiento. En siete de cada diez partidas llegan al azar
@@ -73,16 +73,19 @@ export const CRATE = {
  *
  * | Rareza      | Contenido                                 | Peso |
  * |-------------|-------------------------------------------|------|
- * | Común       | Munición 46 · Botiquín 24 · Pistola 6     | 76   |
+ * | Común       | Munición 40 · Botiquín 20 · Pistola 5     |      |
+ * |             | Granada 6 · Molotov 5                     | 76   |
  * | Poco común  | Escopeta 8 · Fusil de asalto 7            | 15   |
  * | Rara        | Ametralladora 4 · Lanzallamas 3,5         | 7,5  |
  * | Épica       | Lanzacohetes 1,5                          | 1,5  |
  */
 export const LOOT_TABLE: LootTable = {
   entries: [
-    { id: 'ammo', rarity: 'common', weight: 46, item: { kind: 'ammo' } },
-    { id: 'medkit', rarity: 'common', weight: 24, item: { kind: 'medkit', count: 1 } },
-    { id: 'pistol', rarity: 'common', weight: 6, item: { kind: 'weapon', weaponId: 'pistol' } },
+    { id: 'ammo', rarity: 'common', weight: 40, item: { kind: 'ammo' } },
+    { id: 'medkit', rarity: 'common', weight: 20, item: { kind: 'medkit', count: 1 } },
+    { id: 'pistol', rarity: 'common', weight: 5, item: { kind: 'weapon', weaponId: 'pistol' } },
+    { id: 'grenade', rarity: 'common', weight: 6, item: { kind: 'throwable', throwableId: 'grenade', count: 2 } },
+    { id: 'molotov', rarity: 'common', weight: 5, item: { kind: 'throwable', throwableId: 'molotov', count: 2 } },
     { id: 'shotgun', rarity: 'uncommon', weight: 8, item: { kind: 'weapon', weaponId: 'shotgun' } },
     { id: 'rifle', rarity: 'uncommon', weight: 7, item: { kind: 'weapon', weaponId: 'rifle' } },
     { id: 'mg', rarity: 'rare', weight: 4, item: { kind: 'weapon', weaponId: 'mg' } },
@@ -97,9 +100,8 @@ export const LOOT_TABLE: LootTable = {
 
 /** Rareza de una pieza según la tabla (munición y botiquines son comunes). */
 export function rarityOf(item: LootItem): Rarity {
-  const entry = LOOT_TABLE.entries.find((e) =>
-    item.kind === 'weapon' ? e.item.kind === 'weapon' && e.item.weaponId === item.weaponId : e.item.kind === item.kind,
-  );
+  const id = lootId(item);
+  const entry = LOOT_TABLE.entries.find((e) => lootId(e.item) === id);
   return entry?.rarity ?? 'common';
 }
 

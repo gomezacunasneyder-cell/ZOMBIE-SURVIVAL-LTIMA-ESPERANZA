@@ -26,6 +26,8 @@ export class SupplyCrate {
   state: CrateState = 'falling';
   /** Lo que queda dentro. */
   items: LootItem[];
+  /** Las piezas de la caja se entregan una sola vez. */
+  scrapGiven = false;
   readonly rarity: CrateLoot['rarity'];
   private readonly crate: Phaser.GameObjects.Image;
   private readonly chute: Phaser.GameObjects.Sprite;

@@ -38,8 +38,9 @@ Shooter de supervivencia 2D de vista lateral en pixel art. Alex cruza de noche u
 | Recargar | R |
 | Cambiar de arma | 1–6 o rueda del ratón |
 | Usar botiquín | Q |
+| Lanzar granada / cóctel molotov | G / F (caen donde apunta el ratón) |
 | Interactuar (abrir cajas: mantener) | E |
-| Inventario | Tab |
+| Inventario (detiene el juego) | Tab |
 | Pausa | Esc |
 
 Las teclas se definen en un mapa de acciones reasignable, no directamente en el código de juego.
@@ -62,7 +63,7 @@ Las teclas se definen en un mapa de acciones reasignable, no directamente en el 
 | Ametralladora | Automática, cadencia muy alta, recarga lenta | 60 | Muy alto | Suministros (rara) |
 | Lanzallamas | Chorro corto que atraviesa y deja ardiendo; gasta combustible muy deprisa | 80 | Medio | Suministros (rara) |
 | Lanzacohetes | Un cohete que estalla al impactar; también hiere a Alex si está cerca | 1 | Enorme | Suministros (épica, una vez por partida) |
-| Granada / cóctel molotov | Área; el fuego ilumina y hace ruido | Consumible | Muy alto | Suministros |
+| Granada / cóctel molotov | Área: la granada rebota y estalla a los 1,7 s; el molotov deja un charco de fuego que prende, ilumina y hace ruido | Consumible (3 de cada como máximo) | Muy alto | Suministros y recompensas de oleada |
 
 - La munición es propia de cada arma (9 mm, cartuchos, 5.56, cinta 7.62) y se guarda en reserva. Valores exactos en `src/content/weapons.ts`.
 - **Recarga manual** con duración por arma. Se interrumpe al cambiar de arma o al recibir un golpe fuerte. Recargar con balas en el cargador no las pierde.
@@ -73,7 +74,8 @@ Las teclas se definen en un mapa de acciones reasignable, no directamente en el 
 
 - 6 ranuras de arma (una por arma), reserva de munición por tipo, hasta 3 botiquines, consumibles arrojadizos y objetos de misión.
 - **Botiquín (Q):** cura 50 puntos tras un uso de 1,5 s, caminando despacio y sin disparar; recibir daño lo interrumpe sin gastarlo. Se empieza con uno.
-- **Piezas:** moneda para mejoras; la sueltan enemigos y contenedores.
+- **Piezas:** moneda para mejoras; la sueltan enemigos (más los duros; el mutante siempre) y contenedores (cajas de suministros y de munición). Se recogen al pasar cerca y se pierden a los 20 s. Detalle en [decisiones/0008](decisiones/0008-fase-3-mochila.md).
+- **Inventario (Tab):** detiene el juego y muestra las seis ranuras de arma con su munición, consumibles, piezas y objetos de misión; desde él se puede equipar un arma.
 - **Cajas de suministro:** las lanza Cóndor 7 en paracaídas por delante de Alex. Alarma de radio y aviso «¡SUMINISTROS DETECTADOS!», helicóptero que entra por un extremo con el foco encendido, suelta en estacionario y sale por el otro. Llega al azar en el 70 % de las partidas y siempre al alcanzar el campamento (tres como máximo). Cada caja trae munición, botiquines o, a veces, un arma, según una tabla de rarezas (común, poco común, rara, épica) cuyo color luce en su baliza. Como mucho un arma por lanzamiento; la munición tiene tope y lo que no cabe se queda en la caja. Se abre manteniendo E. Su caída y su bengala hacen ruido y los zombis acuden a rodearla: recogerla es un riesgo calculado. Detalle en [decisiones/0006](decisiones/0006-fase-3-suministros.md).
 
 ## 7. Enemigos

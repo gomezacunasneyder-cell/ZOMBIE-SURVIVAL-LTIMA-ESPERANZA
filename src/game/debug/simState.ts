@@ -73,6 +73,17 @@ export interface SimState {
     opening: number | null;
   };
   medkits: { count: number; using: boolean };
+  /** Arrojadizos: los que lleva, los que vuelan, charcos de fuego y totales. */
+  throwables: {
+    grenade: number;
+    molotov: number;
+    flying: { id: string; x: number; y: number }[];
+    fires: number;
+    thrown: number;
+    exploded: number;
+  };
+  /** Piezas reunidas, montoncitos en el suelo y piezas soltadas desde el inicio. */
+  scrap: { total: number; onGround: number; dropped: number };
   /** Enemigos en llamas. */
   burning: number;
   /** Reutilización de enemigos: objetos creados, apariciones y retirados en reserva. */
